@@ -8,7 +8,7 @@ The division below is designed so all four members can work simultaneously, with
 
 ## **1. Division of responsibilities**
 
-**Person 1 — You**
+**Person 1 - Harsha**
 
 Data and labels
 
@@ -33,7 +33,7 @@ candidate_pool.parquet
 label_audit.csv
 ```
 
-**Person 2**
+**Person 2 - Garima**
 
 CMS and feature engineering
 
@@ -58,7 +58,7 @@ cms_quality_report.csv
 feature_dictionary.csv
 ```
 
-**Person 3**
+**Person 3 - Vishrut**
 
 Machine learning
 
@@ -90,7 +90,7 @@ anomaly_model.pkl
 predictions.parquet
 ```
 
-**Person 4**
+**Person 4 - Rishabh**
 
 Evaluation and presentation
 
@@ -212,10 +212,10 @@ Keep this division fixed:
 
 | Member       | Ownership                              |
 | ------------ | -------------------------------------- |
-| **You (P1)** | LEIE, labels and candidate eligibility |
-| **P2**       | CMS cleaning and financial features    |
-| **P3**       | Supervised and unsupervised ML         |
-| **P4**       | Baselines, evaluation and presentation |
+| **Harsha (P1)** | LEIE, labels and candidate eligibility |
+| **Garima (P2)**       | CMS cleaning and financial features    |
+| **Vishrut (P3)**       | Supervised and unsupervised ML         |
+| **Rishabh (P4)**       | Baselines, evaluation and presentation |
 
 This gives each person a clear technical responsibility and an independent deliverable.
 
