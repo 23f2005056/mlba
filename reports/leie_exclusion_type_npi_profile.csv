@@ -1,0 +1,21 @@
+EXCLTYPE,raw_records,unique_npis,distinct_events,description,scenario_A_candidate
+1128a1,3413,3383,3411,Program-related criminal conviction,True
+1128b4,2691,2690,2691,"Licence revocation, suspension or surrender",False
+1128a4,1019,1018,1019,Felony controlled-substance conviction,False
+1128a3,684,681,684,Felony health-care fraud conviction,True
+1128a2,404,403,404,Patient abuse or neglect conviction,False
+1128b7,208,207,208,"Fraud, kickbacks and other prohibited activities",True
+1128b14,196,196,196,Default on health education loan or scholarship,False
+1128b5,156,156,156,Exclusion or suspension by another health-care programme,False
+1128b8,96,96,96,Entity controlled by a sanctioned individual,False
+1128b1,48,48,48,Misdemeanor health-care or other program fraud conviction,True
+1128aa,37,37,37,Unmapped code: requires further investigation,False
+1128b3,20,20,20,Misdemeanor controlled-substance conviction,False
+brch sa,20,20,20,Unmapped code: requires further investigation,False
+1128b6,9,9,9,"Excessive charges, unnecessary services or substandard care",True
+brch cia,9,9,9,Unmapped code: requires further investigation,False
+1128b2,8,8,8,Obstruction of investigation or audit,False
+1128b11,2,2,2,Failure to provide required information,False
+1128b16,1,1,1,False statement or material misrepresentation,False
+1128b15,1,1,1,Individual controlling a sanctioned entity,False
+1156,1,1,1,Failure to meet statutory medical-care obligations,False

@@ -1,0 +1,12 @@
+metric,value
+original_records,84224
+valid_npi_records,9023
+records_without_valid_npi,75201
+unique_valid_npis,8844
+repeated_npi_groups,175
+extra_repeated_npi_rows,179
+duplicate_exclusion_event_rows,2
+exclusion_date_placeholders,0
+invalid_exclusion_dates,0
+reinstatement_date_placeholders,84224
+invalid_reinstatement_dates,0

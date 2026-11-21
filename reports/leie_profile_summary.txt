@@ -1,0 +1,9 @@
+Total records: 84224
+Total columns: 18
+Records with usable-format NPI: 84224
+Records with valid NPI check digit: 9023
+Unique usable NPIs: 8845
+Organisation records: 3546
+Missing/invalid exclusion dates: 0
+Records with reinstatement date: 0
+Invalid reinstatement dates: 84224
