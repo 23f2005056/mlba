@@ -1,17 +1,15 @@
-# Large CMS source datasets
+# CMS source datasets
 /227664-V1/
+/227664-V1.zip
 
-# Raw input data
+# Raw data
 /raw/
+/UPDATED (1).csv
 
 # Generated datasets
 /out/
 
-# Python environment
+# Python environment and cache
 .venv/
-
-# Python cache
 __pycache__/
 *.pyc
-
-data/*
