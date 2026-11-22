@@ -130,5 +130,96 @@ def load_real(data_dir:Path):
                       keys=["npi", "year"], 
                       join_type="left outer")
     df = joined.to_pandas()
-    df["has_features"] = df["has_features"].fillna(False).astype(bool)
+    df["has_features"] = df["has_features"].fillna(False).astype(bool) # Remember that some providers had no matching feature row.
     return df, FEATURE_COLS, 2
+
+def load_stub(stub_dir: Path):
+    '''Loads synthetic/test data into a format compatible with your real-data pipeline.'''
+
+    print(f"--> Loading STUB data from {stub_dir} (synthetic - never report results)")
+    feat = pd.read_parquet(stub_dir / "provider_features.parquet").rename(columns=STUB_RENAME)
+    cand = pd.read_parquet(stub_dir / "candidate_pool.parquet").rename(columns=STUB_RENAME)
+    lab = pd.read_parquet(stub_dir / "labels.parquet").rename(columns=STUB_RENAME)
+
+    # merging the candidate pool with the labels.
+    df = cand.merge(
+        lab[["npi", "year", "y"]], 
+        on=["npi", "year"], 
+        validate="one_to_one")
+
+    # Identify available features
+    feat_cols = [c for c in FEATURE_COLS if c in feat.columns]
+    # Create a feature-only DataFrame
+    f = feat[["npi", "year"] + feat_cols].copy()
+    f[feat_cols] = f[feat_cols].astype("float32")
+
+    f["has_features"] = True
+    df = df.merge(
+        f, 
+        on=["npi", "year"], 
+        how="left", validate="one_to_one")
+    df["has_features"] = df["has_features"].fillna(False).astype(bool)
+
+    # stub dataset doesn't contain a censoring column.
+    # But real-data loader returns: censored
+    df["censored"] = False   # stub has no censoring column
+    return df, feat_cols, 3  # stub labels use a 3-year window
+
+# ---------------------------------------------------------------------------
+# Coverage report
+# ---------------------------------------------------------------------------
+def coverage_report(df, out_csv: Path):
+    '''Analyzes how many eligible providers have features available, broken down by year.'''
+
+    # This groups the dataset by observation year.
+    g = df.groupby("year").agg(
+        eligible_rows=("y", "size"),
+        with_features=("has_features", "sum"),
+        positives=("y", "sum"),
+    )
+
+    g["without_features"] = g["eligible_rows"] - g["with_features"]
+    g["positives_without_features"] = df[~df["has_features"]].groupby("year")["y"].sum()
+    g = g.fillna(0).astype(int).reset_index()
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+
+    # Creates the output directory if it doesn't already exist.
+    g.to_csv(out_csv, index=False)
+    print("\n=== SCORING COVERAGE (eligible rows) ===")
+    print(g.to_string(index=False))
+    print(f"saved {out_csv}")
+    return g
+
+
+# ---------------------------------------------------------------------------
+def main():
+    # Creates an argument parser object.
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data", choices=["stub", "real"], required=True)
+    ap.add_argument("--data-dir", default=None,
+                    help="folder with the input parquet files")
+    args = ap.parse_args()
+
+    # If the user provides a custom data directory → use it.
+    # Otherwise → use the default stub directory inside the repository.
+    if args.data == "stub":
+        data_dir = Path(args.data_dir) if args.data_dir else REPO / "shared_p3_p4_stub"
+        out_dir = report_dir = REPO / "out" / "stub"
+        df, feat_cols, h = load_stub(data_dir)
+    else:
+        data_dir = Path(args.data_dir) if args.data_dir else REPO / "files from team"
+        out_dir, report_dir = REPO / "out", REPO / "reports"
+        df, feat_cols, h = load_real(data_dir)
+
+    check_no_leakage(feat_cols)
+    assert not df.duplicated(["npi", "year"]).any(), "duplicate (npi, year) rows"
+
+    print(f"\nRows: {len(df):,} | features used: {len(feat_cols)} | horizon h={h}")
+    print(f"Positives: {int(df['y'].sum()):,} | positive NPIs: {df.loc[df['y'] == 1, 'npi'].nunique():,}")
+    print(f"Memory: {df.memory_usage(deep=True).sum() / 1024**3:.2f} GB")
+
+    coverage_report(df, report_dir / "p3_scoring_coverage.csv")
+
+
+if __name__ == "__main__":
+    main()
