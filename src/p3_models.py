@@ -6,8 +6,17 @@ Run:
     python src/p3_models.py --data real
     python src/p3_models.py --data real --data-dir "files from team"
 
-Step 2 (this version): load features + labels, keep eligible rows,
-report how many eligible rows have CMS features.
+Approaches (all scored on every eligible provider-year that has CMS features):
+    supervised_lgbm    - LightGBM on Scenario A labels (y_A_h2), config frozen
+    supervised_logreg  - Logistic Regression on the same labels and training rows
+    anomaly_iforest    - Isolation Forest, no labels used
+
+Outputs (out/ for real data, out/stub/ for stub):
+    predictions.parquet    NPI, year, approach, score (higher = higher audit priority)
+    supervised_model.pkl   {"supervised_lgbm": bundle, "supervised_logreg": bundle}
+    anomaly_model.pkl      Isolation Forest bundle
+Reports (reports/ for real data): coverage, splits, val metrics, feature importance,
+logistic coefficients.
 """
 
 # argparse is a Python library used to handle command-line arguments
@@ -22,7 +31,12 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
+from sklearn.ensemble import IsolationForest
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score,roc_auc_score
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
 REPO=Path(__file__).resolve().parent.parent
 
@@ -421,6 +435,128 @@ def run_lightgbm(df, feat_cols, h, decision_years, n_neg, grid, report_dir):
               "params": final_params, "horizon": h, "label": "y_A_h2 (labels v1)"}
     return bundle, preds, val_rows
 
+
+# ---------------------------------------------------------------------------
+# Shared preprocessing for the linear and anomaly models.
+# LightGBM handles NaN and skew itself; these two models need help.
+# ---------------------------------------------------------------------------
+def signed_log(X):
+    """sign(x) * log(1 + |x|): tames heavy-tailed dollar amounts and ratios, keeps sign."""
+    X = np.where(np.isfinite(X), X, np.nan)
+    return np.sign(X) * np.log1p(np.abs(X))
+
+
+def make_preprocessor():
+    """signed log -> median impute -> standardise. Fitted on training rows only."""
+    return Pipeline([
+        ("log", FunctionTransformer(signed_log)),
+        ("impute", SimpleImputer(strategy="median")),
+        ("scale", StandardScaler()),
+    ])
+
+
+# ---------------------------------------------------------------------------
+# Approach A2: Logistic Regression (the plan's primary supervised model)
+# ---------------------------------------------------------------------------
+LR_GRID = [dict(C=c) for c in (0.01, 0.1, 1.0)]   # pre-set, small: ~64 val positives
+
+
+def run_logreg(df, feat_cols, h, decision_years, n_neg, report_dir):
+    print("\n=== APPROACH A2: Logistic Regression ===")
+
+    def fit(Xtr, ytr, C):
+        m = Pipeline([("prep", make_preprocessor()),
+                      ("lr", LogisticRegression(C=C, class_weight="balanced",
+                                                max_iter=2000, random_state=SEED))])
+        return m.fit(Xtr, ytr)
+
+    # 1) Tune C on the validation year (same split + negative sample as LightGBM)
+    T_val = decision_years["val"][0]
+    tr, sc, ty = make_split(df, T_val, h)
+    idx = sample_train(df, tr, n_neg, SEED)
+    Xtr, ytr = X_of(df, idx, feat_cols), df.loc[idx, "y"].to_numpy()
+    Xv, yv = X_of(df, sc, feat_cols), df.loc[sc, "y"].to_numpy()
+
+    val_rows, best = [], None
+    for params in LR_GRID:
+        m = fit(Xtr, ytr, **params)
+        s = m.predict_proba(Xv)[:, 1]
+        met = rank_metrics(yv, s)
+        val_rows.append({"model": "supervised_logreg", "year": T_val,
+                         "params": str(params), "n_estimators": np.nan, **met})
+        print(f"  {params}  PR-AUC={met['pr_auc']:.5f}  ROC={met['roc_auc']:.3f}  "
+              f"recall@1%={met['recall@1%']:.3f}  recall@5%={met['recall@5%']:.3f}")
+        if best is None or met["pr_auc"] > best["pr_auc"]:
+            best = dict(pr_auc=met["pr_auc"], params=params, model=m, score=s)
+    print(f"chosen: {best['params']}")
+    models = {T_val: best["model"]}
+    preds = [pred_frame(df, sc, "supervised_logreg", best["score"])]
+
+    # 2) Refit for each test year on its own allowed years, fixed C
+    coefs = []
+    for T in decision_years["test"]:
+        tr, sc, ty = make_split(df, T, h)
+        idx = sample_train(df, tr, n_neg, SEED + T)
+        m = fit(X_of(df, idx, feat_cols), df.loc[idx, "y"].to_numpy(), **best["params"])
+        s = m.predict_proba(X_of(df, sc, feat_cols))[:, 1]
+        models[T] = m
+        preds.append(pred_frame(df, sc, "supervised_logreg", s))
+        coefs.append(m.named_steps["lr"].coef_[0])
+        print(f"  test {T}: trained on {ty[0]}-{ty[-1]} ({len(idx):,} rows) "
+              f"-> scored {len(sc):,} rows")
+
+    # Standardised coefficients: + raises risk, - lowers it (per 1 SD of signed-log feature)
+    c = np.mean(coefs, axis=0)
+    co = (pd.DataFrame({"feature": feat_cols, "std_coef": c, "abs_coef": np.abs(c)})
+          .sort_values("abs_coef", ascending=False).drop(columns="abs_coef"))
+    co.to_csv(report_dir / "p3_logreg_coefficients.csv", index=False)
+    print("\nTop 10 coefficients (mean over test-year models, standardised):")
+    print(co.head(10).to_string(index=False))
+
+    bundle = {"approach": "supervised_logreg", "models": models, "features": feat_cols,
+              "params": best["params"], "horizon": h, "label": "y_A_h2 (labels v1)"}
+    return bundle, preds, val_rows
+
+
+# ---------------------------------------------------------------------------
+# Approach B: Isolation Forest (no labels used anywhere - not for fitting, not for tuning)
+# For each decision year T: fit on a sample of year-T provider features (known at the
+# end of T), then score every eligible year-T row. Settings are fixed, not tuned.
+# ---------------------------------------------------------------------------
+IF_FIT_ROWS = 200_000
+IF_PARAMS = dict(n_estimators=300, max_samples=256, random_state=SEED, n_jobs=-1)
+
+
+def run_iforest(df, feat_cols, decision_years):
+    print("\n=== APPROACH B: Isolation Forest (unsupervised) ===")
+    models, preds, val_rows = {}, [], []
+    T_val = decision_years["val"][0]
+    for T in decision_years["val"] + decision_years["test"]:
+        sc = df.index[(df["year"] == T) & df["has_features"]]
+        rng = np.random.default_rng(SEED + T)
+        fit_idx = sc if len(sc) <= IF_FIT_ROWS else pd.Index(
+            np.sort(rng.choice(sc, IF_FIT_ROWS, replace=False)))
+        m = Pipeline([("prep", make_preprocessor()),
+                      ("if", IsolationForest(**{**IF_PARAMS,
+                                                "max_samples": min(IF_PARAMS["max_samples"], len(fit_idx))}))])
+        m.fit(X_of(df, fit_idx, feat_cols))
+        s = -m.score_samples(X_of(df, sc, feat_cols))   # higher = more anomalous
+        models[T] = m
+        preds.append(pred_frame(df, sc, "anomaly_iforest", s))
+        print(f"  {T}: fit on {len(fit_idx):,} rows -> scored {len(sc):,} rows")
+        if T == T_val:   # reported for comparison only; nothing is chosen from it
+            met = rank_metrics(df.loc[sc, "y"].to_numpy(), s)
+            val_rows.append({"model": "anomaly_iforest", "year": T,
+                             "params": str(IF_PARAMS), "n_estimators": IF_PARAMS["n_estimators"],
+                             **met})
+            print(f"  val {T} (not used for tuning): PR-AUC={met['pr_auc']:.5f}  "
+                  f"ROC={met['roc_auc']:.3f}  recall@1%={met['recall@1%']:.3f}  "
+                  f"recall@5%={met['recall@5%']:.3f}")
+
+    bundle = {"approach": "anomaly_iforest", "models": models, "features": feat_cols,
+              "params": IF_PARAMS, "fit_rows": IF_FIT_ROWS, "labels_used": False}
+    return bundle, preds, val_rows
+
 # ---------------------------------------------------------------------------
 def main():
     # Creates an argument parser object.
@@ -465,21 +601,34 @@ def main():
                                                n_neg, grid, report_dir)
     val_rows += rows
 
-    pd.DataFrame(val_rows).to_csv(report_dir / "p3_val_metrics.csv", index=False)
+    lr_bundle, lr_preds, rows = run_logreg(df, feat_cols, h, decision_years,
+                                           n_neg, report_dir)
+    val_rows += rows
+
+    if_bundle, if_preds, rows = run_iforest(df, feat_cols, decision_years)
+    val_rows += rows
+
+    vm = pd.DataFrame(val_rows)
+    vm["n_estimators"] = vm["n_estimators"].astype("Int64")   # logreg has none -> blank, not 8.0
+    vm.to_csv(report_dir / "p3_val_metrics.csv", index=False)
     print(f"saved {report_dir / 'p3_val_metrics.csv'}")
 
     # Save the P4 handoff: one row per eligible NPI-year-approach, higher score = higher priority
     out_dir.mkdir(parents=True,exist_ok=True)
-    preds = pd.concat(lgb_preds, ignore_index=True)
+    preds = pd.concat(lgb_preds + lr_preds + if_preds, ignore_index=True)
 
     assert not preds.duplicated(["NPI", "year", "approach"]).any(), "duplicate prediction rows"
 
-    preds.to_parquet(out_dir / "p3_predictions.parquet", index=False)
+    assert preds["score"].notna().all(), "missing scores"
+    preds.to_parquet(out_dir / "predictions.parquet", index=False)
 
-    joblib.dump(lgb_bundle, out_dir / "p3_lgbm_bundle.joblib")
+    joblib.dump({"supervised_lgbm": lgb_bundle, "supervised_logreg": lr_bundle},
+                out_dir / "supervised_model.pkl")
+    joblib.dump(if_bundle, out_dir / "anomaly_model.pkl")
 
-    print(f"saved {len(preds):,} predictions -> {out_dir / 'p3_predictions.parquet'}")
-    print(preds.groupby("year").size().to_string())
+    print(f"\nsaved {len(preds):,} predictions -> {out_dir / 'predictions.parquet'}")
+    print(preds.groupby(["approach", "year"]).size().to_string())
+    print(f"saved {out_dir / 'supervised_model.pkl'} and {out_dir / 'anomaly_model.pkl'}")
 
 if __name__ == "__main__":
     main()
