@@ -15,6 +15,7 @@ import argparse
 from pathlib import Path
 
 import lightgbm as lgb
+import numpy as np
 import pandas as pd
 # as data is stored in Parquet files, and we need to load and process large datasets efficiently
 import pyarrow as pa
@@ -79,8 +80,8 @@ EARLY_STOP = 100             # rounds without val PR-AUC improvement
 # This dictionary contains the base hyperparameters for LightGBM.
 LGB_BASE = dict( 
     objective="binary", 
-    metric="average_precision",
-    learning_rate=0.05, 
+    metric=["auc","average_precision"],
+    learning_rate=0.03, 
     n_estimators=2000,
     subsample=0.8, 
     subsample_freq=1, 
@@ -166,7 +167,7 @@ def load_real(data_dir:Path):
                       keys=["npi", "year"], 
                       join_type="left outer")
     df = joined.to_pandas()
-    df["has_features"] = df["has_features"].fillna(False).astype(bool) # Remember that some providers had no matching feature row.
+    df["has_features"] = df["has_features"].eq(True) # Remember that some providers had no matching feature row.
     return df, FEATURE_COLS, 2
 
 def load_stub(stub_dir: Path):
@@ -194,7 +195,8 @@ def load_stub(stub_dir: Path):
         f, 
         on=["npi", "year"], 
         how="left", validate="one_to_one")
-    df["has_features"] = df["has_features"].fillna(False).astype(bool)
+    df["has_features"] = df["has_features"].eq(True) # this gives the same result as df["has_features"] = df["has_features"].fillna(False).astype(bool)
+    # (missing becomes False) without relying on behaviour pandas is changing.
 
     # stub dataset doesn't contain a censoring column.
     # But real-data loader returns: censored
@@ -355,7 +357,7 @@ def run_lightgbm(df, feat_cols, h, decision_years, n_neg, grid, report_dir):
     idx = sample_train(df, tr, n_neg, SEED)
     Xtr, ytr = X_of(df, idx, feat_cols), df.loc[idx, "y"].to_numpy()
     Xv, yv = X_of(df, sc, feat_cols), df.loc[sc, "y"].to_numpy()
-    spw = (ytr == 0).sum() / max((ytr == 1).sum(), 1)
+    spw = np.sqrt((ytr == 0).sum() / max((ytr == 1).sum(), 1))
     print(f"tuning: train {ty[0]}-{ty[-1]} -> predict {T_val} | "
           f"{len(idx):,} rows ({int(ytr.sum())} pos) | scale_pos_weight={spw:.0f}")
 
@@ -363,7 +365,7 @@ def run_lightgbm(df, feat_cols, h, decision_years, n_neg, grid, report_dir):
     for params in grid:
         m = lgb.LGBMClassifier(**LGB_BASE, **params, scale_pos_weight=spw)
         m.fit(Xtr, ytr, eval_set=[(Xv, yv)],
-              callbacks=[lgb.early_stopping(EARLY_STOP, verbose=False)])
+              callbacks=[lgb.early_stopping(EARLY_STOP, first_metric_only=True, verbose=False)])
         n_iter = int(m.best_iteration_ or LGB_BASE["n_estimators"])
         s = m.predict_proba(Xv)[:, 1]
         met = rank_metrics(yv, s)
@@ -387,7 +389,7 @@ def run_lightgbm(df, feat_cols, h, decision_years, n_neg, grid, report_dir):
         tr, sc, ty = make_split(df, T, h)
         idx = sample_train(df, tr, n_neg, SEED + T)
         Xtr, ytr = X_of(df, idx, feat_cols), df.loc[idx, "y"].to_numpy()
-        spw = (ytr == 0).sum() / max((ytr == 1).sum(), 1)
+        spw = np.sqrt((ytr == 0).sum() / max((ytr == 1).sum(), 1))
         m = lgb.LGBMClassifier(**final_params, scale_pos_weight=spw)
         m.fit(Xtr, ytr)
         s = m.predict_proba(X_of(df, sc, feat_cols))[:, 1]
