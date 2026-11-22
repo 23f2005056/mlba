@@ -38,6 +38,10 @@ from sklearn.metrics import average_precision_score,roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from src.p3_utils import signed_log   # own module so saved .pkl files can be loaded
+
 REPO=Path(__file__).resolve().parent.parent
 
 # ---------------------------------------------------------------------------
@@ -83,11 +87,13 @@ STUB_RENAME = {
 # Decision (prediction) years. Validation is for tuning only; test is reported.
 # ---------------------------------------------------------------------------
 DECISION_YEARS = {
-    "real": {"val": [2020], "test": [2022, 2023]},   # per split_plan.csv, h=2
+    "real": {2: {"val": [2020], "test": [2022, 2023]},   # per split_plan.csv
+             3: {"val": [2020], "test": [2022]}},
     "stub": {"val": [2020], "test": [2021, 2022]},   # stub uses h=3
 }
 
 SEED = 42
+LABEL="y_A_h2" # primary label; set by --label for sensitivity runs
 N_NEG_TRAIN = 100_000      # negatives sampled per training fit (training only)
 N_NEG_QUICK = 100_000        # --quick mode, for smoke tests
 EARLY_STOP = 100             # rounds without val PR-AUC improvement
@@ -144,7 +150,7 @@ def _cast(table,col,typ):
 # and contains ONLY eligible provider-years.
 # ---------------------------------------------------------------------------
 
-def load_real(data_dir:Path):
+def load_real(data_dir:Path,label="y_A_h2"):
     '''
     main data-loading function for real FraudLens dataset. It loads labels and features from Parquet files, 
     filters the data, performs validation, optimizes data types, joins the datasets, and finally converts everything 
@@ -155,7 +161,7 @@ def load_real(data_dir:Path):
 
     # Labels: keep eligible rows only. Primary target y_A_h2.
     lab=pq.read_table(data_dir / "labels.parquet", 
-                      columns=["npi", "year", "eligible", "y_A_h2", "censored_h2"]) # only load the five columns you need instead of loading the entire file.
+                      columns=["npi", "year", "eligible", label, f"censored_h{label[-1]}"]) # only load the five columns you need instead of loading the entire file.
     
     lab = lab.filter(
         pc.equal(
@@ -192,7 +198,7 @@ def load_real(data_dir:Path):
     # pyarrow join output order is not fixed -> sort so seeded sampling is reproducible
     df = df.sort_values(["npi", "year"], kind="stable").reset_index(drop=True)
     df["has_features"] = df["has_features"].eq(True) # Remember that some providers had no matching feature row.
-    return df, FEATURE_COLS, 2
+    return df, FEATURE_COLS, int(label[-1])
 
 def load_stub(stub_dir: Path):
     '''Loads synthetic/test data into a format compatible with your real-data pipeline.'''
@@ -432,7 +438,7 @@ def run_lightgbm(df, feat_cols, h, decision_years, n_neg, grid, report_dir):
     print(fi.head(10).to_string(index=False))
 
     bundle = {"approach": "supervised_lgbm", "models": models, "features": feat_cols,
-              "params": final_params, "horizon": h, "label": "y_A_h2 (labels v1)"}
+              "params": final_params, "horizon": h, "label": f"{LABEL} (labels v1)"}
     return bundle, preds, val_rows
 
 
@@ -440,12 +446,6 @@ def run_lightgbm(df, feat_cols, h, decision_years, n_neg, grid, report_dir):
 # Shared preprocessing for the linear and anomaly models.
 # LightGBM handles NaN and skew itself; these two models need help.
 # ---------------------------------------------------------------------------
-def signed_log(X):
-    """sign(x) * log(1 + |x|): tames heavy-tailed dollar amounts and ratios, keeps sign."""
-    X = np.where(np.isfinite(X), X, np.nan)
-    return np.sign(X) * np.log1p(np.abs(X))
-
-
 def make_preprocessor():
     """signed log -> median impute -> standardise. Fitted on training rows only."""
     return Pipeline([
@@ -514,7 +514,7 @@ def run_logreg(df, feat_cols, h, decision_years, n_neg, report_dir):
     print(co.head(10).to_string(index=False))
 
     bundle = {"approach": "supervised_logreg", "models": models, "features": feat_cols,
-              "params": best["params"], "horizon": h, "label": "y_A_h2 (labels v1)"}
+              "params": best["params"], "horizon": h, "label": f"{LABEL} (labels v1)"}
     return bundle, preds, val_rows
 
 
@@ -566,7 +566,13 @@ def main():
                     help="folder with the input parquet files")
     ap.add_argument("--quick", action="store_true",
                     help="sample only 100k negatives (smoke test)")
+    ap.add_argument("--label", default="y_A_h2", choices=["y_A_h2", "y_B_h2", "y_A_h3"],
+                    help="target label; non-default = sensitivity run (real data only)")
     args = ap.parse_args()
+
+    global LABEL
+    LABEL = args.label
+    assert args.data == "real" or LABEL == "y_A_h2", "--label is for real data only"
 
     # If the user provides a custom data directory → use it.
     # Otherwise → use the default stub directory inside the repository.
@@ -577,7 +583,11 @@ def main():
     else:
         data_dir = Path(args.data_dir) if args.data_dir else REPO / "files from team"
         out_dir, report_dir = REPO / "out", REPO / "reports"
-        df, feat_cols, h = load_real(data_dir)
+        if LABEL != "y_A_h2":   # sensitivity runs never overwrite the primary results
+            out_dir = REPO / "out" / LABEL
+            report_dir = REPO / "reports" / "sensitivity" / LABEL
+            report_dir.mkdir(parents=True, exist_ok=True)
+        df, feat_cols, h = load_real(data_dir, LABEL)
 
     check_no_leakage(feat_cols)
     assert not df.duplicated(["npi", "year"]).any(), "duplicate (npi, year) rows"
@@ -588,7 +598,7 @@ def main():
 
     coverage_report(df, report_dir / "p3_scoring_coverage.csv")
 
-    decision_years = DECISION_YEARS[args.data]
+    decision_years = DECISION_YEARS["stub"] if args.data == "stub" else DECISION_YEARS["real"][h]
     if args.data == "real":
         check_split_plan(data_dir / "split_plan.csv", h, sorted(df["year"].unique()), decision_years)
     split_summary(df, h, decision_years, report_dir / "p3_split_summary.csv")
