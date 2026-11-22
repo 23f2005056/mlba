@@ -14,11 +14,13 @@ report how many eligible rows have CMS features.
 import argparse
 from pathlib import Path
 
+import lightgbm as lgb
 import pandas as pd
 # as data is stored in Parquet files, and we need to load and process large datasets efficiently
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
+from sklearn.metrics import average_precision_score,roc_auc_score
 
 REPO=Path(__file__).resolve().parent.parent
 
@@ -68,6 +70,32 @@ DECISION_YEARS = {
     "real": {"val": [2020], "test": [2022, 2023]},   # per split_plan.csv, h=2
     "stub": {"val": [2020], "test": [2021, 2022]},   # stub uses h=3
 }
+
+SEED = 42
+N_NEG_TRAIN = 1_000_000      # negatives sampled per training fit (training only)
+N_NEG_QUICK = 100_000        # --quick mode, for smoke tests
+EARLY_STOP = 100             # rounds without val PR-AUC improvement
+
+# This dictionary contains the base hyperparameters for LightGBM.
+LGB_BASE = dict( 
+    objective="binary", 
+    metric="average_precision",
+    learning_rate=0.05, 
+    n_estimators=2000,
+    subsample=0.8, 
+    subsample_freq=1, 
+    colsample_bytree=0.8, # This controls feature sampling. Each tree uses approximately 80% of the available features.
+    reg_lambda=5.0, # This is L2 regularization.
+    random_state=SEED, 
+    n_jobs=-1, 
+    verbose=-1,
+)
+# Small grid on purpose: only ~64 validation positives.
+LGB_GRID = [dict(num_leaves=nl, min_child_samples=mcs)
+            for nl in (7, 15, 31) for mcs in (50, 200)]
+
+# Stub has ~20 rows, so leaves must be allowed to hold 1 row.
+STUB_LGB_GRID = [dict(num_leaves=3, min_child_samples=1)]
 
 def check_no_leakage(cols):
     '''It ensures that ML model's feature list does not accidentally contain columns
@@ -272,12 +300,124 @@ def split_summary(df, h, decision_years, out_csv: Path):
     return s
 
 # ---------------------------------------------------------------------------
+# Shared helpers for all models
+# ---------------------------------------------------------------------------
+def X_of(df, idx, feat_cols):
+    return df.loc[idx, feat_cols].to_numpy(dtype=np.float32)
+
+
+def sample_train(df, tr_idx, n_neg, seed):
+    """All positives + at most n_neg random negatives. Training only."""
+    y = df.loc[tr_idx, "y"].to_numpy()
+    pos, neg = tr_idx[y == 1], tr_idx[y == 0]
+    rng = np.random.default_rng(seed)
+    if len(neg) > n_neg:
+        neg = rng.choice(neg, n_neg, replace=False)
+    idx = np.concatenate([np.asarray(pos), np.asarray(neg)])
+    rng.shuffle(idx)
+    return pd.Index(idx)
+
+
+def rank_metrics(y, s):
+    """Model-selection metrics only. Official evaluation + CIs belong to P4."""
+    y, s = np.asarray(y), np.asarray(s, dtype=float)
+    out = {"n": len(y), "positives": int(y.sum()), "base_rate": y.mean()}
+    if 0 < y.sum() < len(y):
+        out["pr_auc"] = average_precision_score(y, s)
+        out["roc_auc"] = roc_auc_score(y, s)
+    else:
+        out["pr_auc"] = out["roc_auc"] = float("nan")
+    order = np.argsort(-s, kind="stable")
+    for q in (0.01, 0.05):
+        k = max(1, int(np.ceil(q * len(s))))
+        out[f"recall@{q:.0%}"] = y[order[:k]].sum() / max(y.sum(), 1)
+    return out
+
+
+def pred_frame(df, idx, approach, score):
+    return pd.DataFrame({
+        "NPI": df.loc[idx, "npi"].to_numpy(),
+        "year": df.loc[idx, "year"].to_numpy(),
+        "approach": approach,
+        "score": np.asarray(score, dtype="float64"),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Approach A1: LightGBM
+# ---------------------------------------------------------------------------
+def run_lightgbm(df, feat_cols, h, decision_years, n_neg, grid, report_dir):
+    print("\n=== APPROACH A1: LightGBM ===")
+
+    # 1) Tune on the validation year
+    T_val = decision_years["val"][0]
+    tr, sc, ty = make_split(df, T_val, h)
+    idx = sample_train(df, tr, n_neg, SEED)
+    Xtr, ytr = X_of(df, idx, feat_cols), df.loc[idx, "y"].to_numpy()
+    Xv, yv = X_of(df, sc, feat_cols), df.loc[sc, "y"].to_numpy()
+    spw = (ytr == 0).sum() / max((ytr == 1).sum(), 1)
+    print(f"tuning: train {ty[0]}-{ty[-1]} -> predict {T_val} | "
+          f"{len(idx):,} rows ({int(ytr.sum())} pos) | scale_pos_weight={spw:.0f}")
+
+    val_rows, best = [], None
+    for params in grid:
+        m = lgb.LGBMClassifier(**LGB_BASE, **params, scale_pos_weight=spw)
+        m.fit(Xtr, ytr, eval_set=[(Xv, yv)],
+              callbacks=[lgb.early_stopping(EARLY_STOP, verbose=False)])
+        n_iter = int(m.best_iteration_ or LGB_BASE["n_estimators"])
+        s = m.predict_proba(Xv)[:, 1]
+        met = rank_metrics(yv, s)
+        val_rows.append({"model": "supervised_lgbm", "year": T_val,
+                         "params": str(params), "n_estimators": n_iter, **met})
+        print(f"  {params} trees={n_iter:4d}  PR-AUC={met['pr_auc']:.5f}  "
+              f"ROC={met['roc_auc']:.3f}  recall@1%={met['recall@1%']:.3f}  "
+              f"recall@5%={met['recall@5%']:.3f}")
+        if best is None or met["pr_auc"] > best["pr_auc"]:
+            best = dict(pr_auc=met["pr_auc"], params=params, n_iter=n_iter, model=m, score=s)
+
+    print(f"chosen: {best['params']} with {best['n_iter']} trees "
+          f"(val base rate {yv.mean():.2e}, random recall@1% = 0.010)")
+    models = {T_val: best["model"]}
+    preds = [pred_frame(df, sc, "supervised_lgbm", best["score"])]
+
+    # 2) Refit for each test year on its own allowed years, fixed settings
+    final_params = {**LGB_BASE, "n_estimators": best["n_iter"], **best["params"]}
+    imp = np.zeros(len(feat_cols))
+    for T in decision_years["test"]:
+        tr, sc, ty = make_split(df, T, h)
+        idx = sample_train(df, tr, n_neg, SEED + T)
+        Xtr, ytr = X_of(df, idx, feat_cols), df.loc[idx, "y"].to_numpy()
+        spw = (ytr == 0).sum() / max((ytr == 1).sum(), 1)
+        m = lgb.LGBMClassifier(**final_params, scale_pos_weight=spw)
+        m.fit(Xtr, ytr)
+        s = m.predict_proba(X_of(df, sc, feat_cols))[:, 1]
+        models[T] = m
+        preds.append(pred_frame(df, sc, "supervised_lgbm", s))
+        g = m.booster_.feature_importance("gain")
+        imp += g / max(g.sum(), 1e-12)
+        print(f"  test {T}: trained on {ty[0]}-{ty[-1]} ({len(idx):,} rows, "
+              f"{int(ytr.sum())} pos) -> scored {len(sc):,} rows")
+
+    fi = (pd.DataFrame({"feature": feat_cols,
+                        "share_of_gain": imp / max(imp.sum(), 1e-12)})
+          .sort_values("share_of_gain", ascending=False))
+    fi.to_csv(report_dir / "p3_feature_importance.csv", index=False)
+    print("\nTop 10 features (mean share of gain over test-year models):")
+    print(fi.head(10).to_string(index=False))
+
+    bundle = {"approach": "supervised_lgbm", "models": models, "features": feat_cols,
+              "params": final_params, "horizon": h, "label": "y_A_h2 (labels v1)"}
+    return bundle, preds, val_rows
+
+# ---------------------------------------------------------------------------
 def main():
     # Creates an argument parser object.
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", choices=["stub", "real"], required=True)
     ap.add_argument("--data-dir", default=None,
                     help="folder with the input parquet files")
+    ap.add_argument("--quick", action="store_true",
+                    help="sample only 100k negatives (smoke test)")
     args = ap.parse_args()
 
     # If the user provides a custom data directory → use it.
@@ -304,6 +444,17 @@ def main():
     if args.data == "real":
         check_split_plan(data_dir / "split_plan.csv", h, sorted(df["year"].unique()), decision_years)
     split_summary(df, h, decision_years, report_dir / "p3_split_summary.csv")
+
+    n_neg = N_NEG_QUICK if args.quick else N_NEG_TRAIN
+    grid = STUB_LGB_GRID if args.data == "stub" else LGB_GRID
+
+    val_rows = []
+    lgb_bundle, lgb_preds, rows = run_lightgbm(df, feat_cols, h, decision_years,
+                                               n_neg, grid, report_dir)
+    val_rows += rows
+
+    pd.DataFrame(val_rows).to_csv(report_dir / "p3_val_metrics.csv", index=False)
+    print(f"saved {report_dir / 'p3_val_metrics.csv'}")
 
 if __name__ == "__main__":
     main()
