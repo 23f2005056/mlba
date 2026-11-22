@@ -14,6 +14,7 @@ report how many eligible rows have CMS features.
 import argparse
 from pathlib import Path
 
+import joblib
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
@@ -95,6 +96,8 @@ LGB_BASE = dict(
     random_state=SEED, 
     n_jobs=-1, 
     verbose=-1,
+    deterministic=True,
+    force_row_wise=True,
 )
 # Small grid on purpose: only ~64 validation positives.
 LGB_GRID = [dict(num_leaves=nl, min_child_samples=mcs)
@@ -172,6 +175,8 @@ def load_real(data_dir:Path):
                       keys=["npi", "year"], 
                       join_type="left outer")
     df = joined.to_pandas()
+    # pyarrow join output order is not fixed -> sort so seeded sampling is reproducible
+    df = df.sort_values(["npi", "year"], kind="stable").reset_index(drop=True)
     df["has_features"] = df["has_features"].eq(True) # Remember that some providers had no matching feature row.
     return df, FEATURE_COLS, 2
 
@@ -462,6 +467,19 @@ def main():
 
     pd.DataFrame(val_rows).to_csv(report_dir / "p3_val_metrics.csv", index=False)
     print(f"saved {report_dir / 'p3_val_metrics.csv'}")
+
+    # Save the P4 handoff: one row per eligible NPI-year-approach, higher score = higher priority
+    out_dir.mkdir(parents=True,exist_ok=True)
+    preds = pd.concat(lgb_preds, ignore_index=True)
+
+    assert not preds.duplicated(["NPI", "year", "approach"]).any(), "duplicate prediction rows"
+
+    preds.to_parquet(out_dir / "p3_predictions.parquet", index=False)
+
+    joblib.dump(lgb_bundle, out_dir / "p3_lgbm_bundle.joblib")
+
+    print(f"saved {len(preds):,} predictions -> {out_dir / 'p3_predictions.parquet'}")
+    print(preds.groupby("year").size().to_string())
 
 if __name__ == "__main__":
     main()
