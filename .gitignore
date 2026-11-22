@@ -16,3 +16,7 @@ __pycache__/
 
 # Temporary generated output folders
 out_*/
+
+# Team data handoff (about 1.4 GB, shared via team drive)
+/files from team/
+/shared_p3_p4_stub/

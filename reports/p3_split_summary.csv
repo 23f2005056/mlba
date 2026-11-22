@@ -1,0 +1,4 @@
+role,prediction_year,train_years,train_rows,train_positives,train_positive_npis,score_rows,score_positives
+val,2020,2013-2018,5859155,462,325,1100790,64
+test,2022,2013-2020,8055880,581,410,1165640,82
+test,2023,2013-2021,9189791,655,461,1196525,58
