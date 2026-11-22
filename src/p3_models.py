@@ -73,15 +73,20 @@ DECISION_YEARS = {
 }
 
 SEED = 42
-N_NEG_TRAIN = 1_000_000      # negatives sampled per training fit (training only)
+N_NEG_TRAIN = 100_000      # negatives sampled per training fit (training only)
 N_NEG_QUICK = 100_000        # --quick mode, for smoke tests
 EARLY_STOP = 100             # rounds without val PR-AUC improvement
 
 # This dictionary contains the base hyperparameters for LightGBM.
+# FROZEN after 4 runs judged on 2020 (reports/p3_val_metrics_v1..v4).
+# Pre-set rule: keep sqrt-weight/AUC-stop only if 2020 PR-AUC >= 0.0010; v3 got 0.00096,
+# so we fell back to v1 settings (full weight, PR-AUC stop) with 100k negatives (v4: 0.00118).
+# Do not tune further - 2022/2023 (P4) are the honest estimates.
+
 LGB_BASE = dict( 
     objective="binary", 
-    metric=["auc","average_precision"],
-    learning_rate=0.03, 
+    metric="average_precision",
+    learning_rate=0.05, 
     n_estimators=2000,
     subsample=0.8, 
     subsample_freq=1, 
@@ -357,7 +362,7 @@ def run_lightgbm(df, feat_cols, h, decision_years, n_neg, grid, report_dir):
     idx = sample_train(df, tr, n_neg, SEED)
     Xtr, ytr = X_of(df, idx, feat_cols), df.loc[idx, "y"].to_numpy()
     Xv, yv = X_of(df, sc, feat_cols), df.loc[sc, "y"].to_numpy()
-    spw = np.sqrt((ytr == 0).sum() / max((ytr == 1).sum(), 1))
+    spw = (ytr == 0).sum() / max((ytr == 1).sum(), 1)
     print(f"tuning: train {ty[0]}-{ty[-1]} -> predict {T_val} | "
           f"{len(idx):,} rows ({int(ytr.sum())} pos) | scale_pos_weight={spw:.0f}")
 
@@ -389,7 +394,7 @@ def run_lightgbm(df, feat_cols, h, decision_years, n_neg, grid, report_dir):
         tr, sc, ty = make_split(df, T, h)
         idx = sample_train(df, tr, n_neg, SEED + T)
         Xtr, ytr = X_of(df, idx, feat_cols), df.loc[idx, "y"].to_numpy()
-        spw = np.sqrt((ytr == 0).sum() / max((ytr == 1).sum(), 1))
+        spw = (ytr == 0).sum() / max((ytr == 1).sum(), 1)
         m = lgb.LGBMClassifier(**final_params, scale_pos_weight=spw)
         m.fit(Xtr, ytr)
         s = m.predict_proba(X_of(df, sc, feat_cols))[:, 1]
