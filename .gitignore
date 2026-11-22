@@ -13,3 +13,6 @@
 .venv/
 __pycache__/
 *.pyc
+
+# Team data handoff (about 1.4 GB, shared via team drive)
+/files from team/
