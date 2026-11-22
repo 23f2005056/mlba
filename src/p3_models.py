@@ -61,6 +61,14 @@ STUB_RENAME = {
     "services_per_beneficiary": "srvcs_per_bene",
 }
 
+# ---------------------------------------------------------------------------
+# Decision (prediction) years. Validation is for tuning only; test is reported.
+# ---------------------------------------------------------------------------
+DECISION_YEARS = {
+    "real": {"val": [2020], "test": [2022, 2023]},   # per split_plan.csv, h=2
+    "stub": {"val": [2020], "test": [2021, 2022]},   # stub uses h=3
+}
+
 def check_no_leakage(cols):
     '''It ensures that ML model's feature list does not accidentally contain columns
       that could reveal the target variable or information that shouldn't be used for prediction.    
@@ -190,6 +198,78 @@ def coverage_report(df, out_csv: Path):
     print(f"saved {out_csv}")
     return g
 
+# ---------------------------------------------------------------------------
+# Maturity-aware splits
+# ---------------------------------------------------------------------------
+def allowed_train_years(T, h, years):
+    """A year-T' row may train a model predicting year T only if T' + h <= T."""
+    return [y for y in sorted(years) if y + h <= T]
+
+
+def check_split_plan(split_plan_csv: Path, h, years, decision_years):
+    """Our rule must reproduce P1's frozen split_plan.csv exactly."""
+    plan = pd.read_csv(split_plan_csv) # read the split plan
+    plan = plan[plan["horizon"] == h]
+    # This selects only rows where the prediction horizon is 2 years.
+    # Why?
+    # Because a two-year prediction task and a three-year prediction task have different label-maturity requirements and 
+    # therefore potentially different training years.
+
+
+    # itertuples() iterates over the DataFrame rows, 
+    # returning each row as an object whose columns can be accessed using dot notation.
+    for r in plan.itertuples():
+        expected = [int(x) for x in str(r.allowed_train_years).split()]
+        ours = allowed_train_years(r.prediction_year, h, years)
+        assert ours == expected, f"split mismatch for {r.prediction_year}: {ours} vs {expected}"
+
+    planned = {r.role: [] for r in plan.itertuples()}
+    for r in plan.itertuples():
+        planned[r.role].append(int(r.prediction_year))
+
+    # This verifies that the prediction years planned to be evaluated match P1's split plan exactly.
+    assert planned == decision_years, f"decision years {decision_years} != split_plan {planned}" 
+    print(f"split_plan.csv check passed for h={h}")
+
+
+def make_split(df, T, h):
+    """Return (train_index, score_index) for prediction year T."""
+    years = df["year"].unique()
+    train_years = allowed_train_years(T, h, years)
+    assert train_years, f"no mature training years for T={T}"
+
+    train_mask = df["year"].isin(train_years) & df["has_features"] & ~df["censored"]
+    score_mask = (df["year"] == T) & df["has_features"]
+
+    # Leakage guards
+    assert df.loc[train_mask, "year"].max() + h <= T, "immature label used in training"
+    assert not df.loc[df["year"].isin(train_years), "censored"].any(), \
+        "censored rows inside allowed training years - check labels"
+    assert not (train_mask & score_mask).any()
+
+    return df.index[train_mask], df.index[score_mask], train_years
+
+
+def split_summary(df, h, decision_years, out_csv: Path):
+    rows = []
+    for role, Ts in decision_years.items():
+        for T in Ts:
+            tr, sc, ty = make_split(df, T, h)
+            rows.append({
+                "role": role, "prediction_year": T,
+                "train_years": f"{ty[0]}-{ty[-1]}",
+                "train_rows": len(tr),
+                "train_positives": int(df.loc[tr, "y"].sum()),
+                "train_positive_npis": df.loc[tr][df.loc[tr, "y"] == 1]["npi"].nunique(),
+                "score_rows": len(sc),
+                "score_positives": int(df.loc[sc, "y"].sum()),
+            })
+    s = pd.DataFrame(rows)
+    s.to_csv(out_csv, index=False)
+    print("\n=== SPLITS (maturity rule T' + h <= T) ===")
+    print(s.to_string(index=False))
+    print(f"saved {out_csv}")
+    return s
 
 # ---------------------------------------------------------------------------
 def main():
@@ -220,6 +300,10 @@ def main():
 
     coverage_report(df, report_dir / "p3_scoring_coverage.csv")
 
+    decision_years = DECISION_YEARS[args.data]
+    if args.data == "real":
+        check_split_plan(data_dir / "split_plan.csv", h, sorted(df["year"].unique()), decision_years)
+    split_summary(df, h, decision_years, report_dir / "p3_split_summary.csv")
 
 if __name__ == "__main__":
     main()
