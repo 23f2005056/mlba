@@ -29,17 +29,15 @@ for file_path in files:
     parent_dir = os.path.basename(os.path.dirname(file_path))
     
     # Try to extract 4-digit year from directory or filename (e.g. 2013 or D13)
-    match = re.search(r'(20\d\d)', file_path)
-    if match:
-        year = int(match.group(1))
+    d_match = re.search(r'_D(\d{2})_', filename)      # D13 -> 2013 ... D23 -> 2023
+    if d_match:
+        year = 2000 + int(d_match.group(1))
     else:
-        # Match D13 -> 2013, D23 -> 2023
-        d_match = re.search(r'_D(\d{2})_', filename)
-        if d_match:
-            year = 2000 + int(d_match.group(1))
-        else:
+        m = re.search(r'(20\d\d)', filename)          # file NAME only, never the full path
+        if not m:
             print(f"Skipping {filename}: unable to determine year")
             continue
+        year = int(m.group(1))
 
     print(f"--> Processing Year {year}: {filename}")
 
