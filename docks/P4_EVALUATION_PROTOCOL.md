@@ -1,17 +1,21 @@
 # FraudLens P4 evaluation protocol
 
-Status: **provisional pending team confirmation**. This document records the rules
+Status: **provisional pending P2/P3 confirmation**. P1 has confirmed the primary
+outcome, uncensored test windows, and individual-practitioner evaluation pool.
+This document records the rules
 used for the held-out P4 test results in `reports/p4_evaluation_summary.md`.
 The outcome, test years, and score direction
-follow the real files and `stubs/P3_HANDOFF_FOR_P4.md`. No single primary audit
-capacity has been established; treatment of candidates without model scores
-also needs team confirmation.
+follow the real files and P3's prediction handoff. No single primary audit
+capacity has been established; P2/P3 handoff confirmations remain. All rows in
+the individual evaluation pool have all three model scores.
 
 ## Decision and outcome
 
 - Decision unit: one eligible provider (`npi`) in one reporting year (`year`).
 - Primary outcome: `labels.y_A_h2`, a Scenario A exclusion within the next two
   years. A row is evaluable only when `censored_h2 == False`.
+- P1 confirmed that 2022 and 2023 have complete, uncensored two-year windows.
+  The 2023 three-year label is censored and is not used.
 - Primary held-out test years: **2022 and 2023**, reported separately. The 2020
   predictions are validation data and are not a held-out test result.
 - P3's three approaches are `supervised_lgbm`, `supervised_logreg`, and
@@ -24,7 +28,8 @@ also needs team confirmation.
 
 | Local input | Required columns | Use |
 | --- | --- | --- |
-| `stubs/candidate_pool.parquet` | `npi`, `year` | Eligible audit population |
+| `stubs/candidate_pool.parquet` | `npi`, `year` | Broader upstream eligible candidates, including organisations; not the primary test denominator |
+| `eval_pool.parquet` (P1 handoff) | `npi`, `year` | Final individual-practitioner evaluation denominator; reconstructed from eligible labels and P2 feature keys until the actual file is supplied |
 | `stubs/labels.parquet` | `npi`, `year`, `eligible`, `y_A_h2`, `censored_h2` | Outcome and observability |
 | `stubs/provider_features.parquet` | `npi`, `year`, `medicare_payment`, `pymt_per_bene`, `specialty` | Baselines and shortlist context |
 | `stubs/predictions.parquet` | `NPI`, `year`, `approach`, `score` | Model rankings; rename `NPI` to `npi` for joining |
@@ -38,17 +43,21 @@ generator against these paths.
 
 ## Comparison populations
 
-1. **Primary fair-comparison population:** within each test year, start from
-   P1's eligible candidate pool, require an uncensored label and P2 features,
-   then require a finite score from **all three** P3 approaches. Rank the two
-   payment baselines and all three models over exactly these same providers.
-2. **Full-pool coverage report:** separately show the size and positive count
-   of P1's entire eligible, uncensored pool, how many have P2 features, and
-   how many receive every P3 score. Count positive candidates lost at each
-   step. This prevents the common-pool metrics from hiding model coverage.
-3. Do not assign a made-up score to unscored candidates. If the team requests
-   operational recall over the full eligible pool, report it separately and
-   count unscored positive candidates as misses.
+1. **Primary fair-comparison population:** use P1's `eval_pool.parquet`: eligible
+   individual practitioners with P2 feature rows. Require an uncensored
+   `y_A_h2` label and a finite score from **all three** P3 approaches. Rank
+   both payment baselines and all models over these same NPI-year keys.
+   P1's published `eligible AND in_features` construction was reproduced from
+   local inputs. Its 2022 and 2023 keys exactly match P4's existing test
+   cohorts: 1,165,640/82 positives and 1,196,525/58 positives. The actual
+   P1-generated Parquet file has not yet been supplied for direct comparison.
+2. **Upstream coverage report:** separately describe P1's broader eligible
+   candidate pool, which includes organisations. It is not the test-metric
+   denominator. The 4 and 3 positive records outside the individual
+   evaluation pool have no P2 feature row; their exact entity types have not
+   been established. Within the evaluation pool, all three scores cover 100%.
+3. Do not assign a made-up score to upstream candidates outside the evaluation
+   pool. Report any upstream sensitivity separately from primary test recall.
 
 ## Ranking and metrics
 
@@ -69,6 +78,9 @@ generator against these paths.
   test years for the primary result.
 - Compare rankings with paired bootstrap uncertainty and shortlist overlap
   after the basic top-K results pass input checks.
+- Keep 2022 and 2023 primary metrics separate. The combined 140 positive
+  provider-year records correspond to 113 distinct NPIs. Any supplementary
+  two-year bootstrap resamples whole NPIs so repeated providers stay together.
 
 ## Audit capacity exploration on 2020 validation
 
@@ -100,12 +112,10 @@ optimal without a capacity or cost/value decision rule.
 1. **Audit capacity `K`:** evaluate `100`, `500`, and `1000` equally for all
    approaches. A single operational capacity remains unselected because no
    audit budget or cost/value rule has been supplied.
-2. **Population:** P1 and P2 should confirm that restricting the primary
-   comparison to feature-covered, scored individual practitioners matches the
-   intended audit decision. The full candidate-pool coverage will be shown
-   regardless.
-3. **Outcome:** P1 should confirm that Scenario A, horizon two, and the 2022
-   and 2023 outcome windows are the final primary test definition.
+2. **P2 handoff:** confirm that the final feature file follows the
+   individual-practitioner filter in the feature-building code.
+3. **P1 file:** if available, provide the generated `eval_pool.parquet` for a
+   direct file comparison; its published formula and counts already reconcile.
 4. **Predictions:** P3 should confirm that higher scores always mean higher
    audit priority and that 2022 and 2023 were not used to choose settings.
 

@@ -84,7 +84,7 @@ def evaluate_year(
         min_hits = hits_above + max(0, selected_from_tie - (tie_size - positives_in_tie))
         max_hits = hits_above + min(selected_from_tie, positives_in_tie)
 
-        full_positives = int(cover["eligible_positives"])
+        upstream_positives = int(cover["eligible_positives"])
         rows.append(
             {
                 "year": year,
@@ -92,16 +92,15 @@ def evaluate_year(
                 "K": k,
                 "common_pool_size": n,
                 "common_pool_positives": positives,
-                "full_eligible_size": int(cover["eligible_candidates"]),
-                "full_eligible_positives": full_positives,
-                "unscored_eligible": int(cover["eligible_candidates"]) - n,
-                "unscored_positives": full_positives - positives,
+                "upstream_candidate_size": int(cover["eligible_candidates"]),
+                "upstream_candidate_positives": upstream_positives,
+                "outside_eval_pool_upstream_candidates": int(cover["eligible_candidates"]) - n,
+                "outside_eval_pool_upstream_positives": upstream_positives - positives,
                 "hits_at_k": hits,
                 "precision_at_k": hits / k,
                 "recall_at_k": hits / positives,
                 "lift_at_k": (hits / k) / (positives / n),
                 "audits_per_hit": k / hits if hits else float("nan"),
-                "full_pool_recall_at_k": hits / full_positives if full_positives else float("nan"),
                 "cutoff_tie_size": tie_size,
                 "selected_from_cutoff_tie": selected_from_tie,
                 "positives_in_cutoff_tie": positives_in_tie,

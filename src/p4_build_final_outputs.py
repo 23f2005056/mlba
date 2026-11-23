@@ -127,14 +127,14 @@ def chart_lines(results: pd.DataFrame, field: str, title: str, ylabel: str, file
 def chart_coverage(coverage: pd.DataFrame) -> None:
     fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.7))
     labels = [str(y) for y in YEARS]
-    scored_share = coverage["scored_provider_coverage"].to_numpy()
-    hit_share = (coverage["scored_pool_later_exclusions"] / coverage["full_eligible_later_exclusions"]).to_numpy()
+    scored_share = coverage["eval_pool_share_of_upstream_candidates"].to_numpy()
+    hit_share = coverage["eval_pool_positive_share_of_upstream"].to_numpy()
     for ax, share, title in (
-        (axes[0], scored_share, "Eligible providers with all three scores"),
-        (axes[1], hit_share, "Later exclusions in the scored pool"),
+        (axes[0], scored_share, "Upstream candidates in individual eval pool"),
+        (axes[1], hit_share, "Upstream positive records in eval pool"),
     ):
-        ax.barh(labels, share, color="#1769aa", label="Covered")
-        ax.barh(labels, 1 - share, left=share, color="#e2e6ec", label="Unscored")
+        ax.barh(labels, share, color="#1769aa", label="In evaluation pool")
+        ax.barh(labels, 1 - share, left=share, color="#e2e6ec", label="Outside pool")
         ax.set_xlim(0, 1)
         ax.xaxis.set_major_formatter(PercentFormatter(xmax=1))
         ax.set_title(title, fontsize=11)
@@ -142,7 +142,7 @@ def chart_coverage(coverage: pd.DataFrame) -> None:
             ax.text(value / 2, i, f"{value:.1%}", ha="center", va="center", color="white", fontweight="bold")
         ax.invert_yaxis()
         ax.grid(axis="x", alpha=0.15)
-    fig.suptitle("Model scoring coverage", fontsize=15, fontweight="bold")
+    fig.suptitle("Individual evaluation pool within upstream candidates", fontsize=15, fontweight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.91))
     fig.savefig(FIGURES / "p4_scoring_coverage.png", dpi=180, bbox_inches="tight")
     plt.close(fig)
@@ -152,13 +152,13 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
     lines = [
         "# FraudLens P4 evaluation summary",
         "",
-        "**Status: provisional.** This report uses held-out 2022 and 2023 provider-year cohorts. The team still needs to confirm the outcome, candidate population, and score-direction/test-split handoff before publication.",
+        "**Status: provisional.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P2 and P3 handoff confirmations remain before final publication.",
         "",
         "## Decision evaluated",
         "",
         "At the end of a reporting year, rank eligible providers for audit. A hit is a provider with a later Scenario A LEIE exclusion within the two-year label window (`y_A_h2`). This is a proxy for audit prioritisation, not proven billing fraud or a measured recovery.",
         "",
-        "Every model and baseline uses the same scored pool within each year. K = 100, 500, and 1,000 are audit-capacity scenarios, not an operationally selected capacity. The 2020 data was used for validation, not for this held-out table.",
+        "Every model and baseline uses the same P1 evaluation pool within each year: eligible individuals with P2 features. P1's `eval_pool.parquet` was not supplied locally, so P4 reconstructed its published rule from labels and feature keys; the reconstructed keys exactly match P4's test cohorts. All providers in this pool have all three scores. K = 100, 500, and 1,000 are audit-capacity scenarios, not an operationally selected capacity. The 2020 data was used for validation, not for this held-out table.",
         "",
         "## Held-out results",
         "",
@@ -178,18 +178,19 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
         "- In 2022, LightGBM found 3 hits at K=500 versus 2 for logistic regression and 0 for Isolation Forest. Logistic regression's 2 hits were already on LightGBM's list.",
         "- In 2023, Isolation Forest found 1 hit at K=500 while the supervised models found 0. At K=1,000, LightGBM and Isolation Forest each found 1, but they were different providers.",
         "- All 18 paired 95% bootstrap intervals for model hit differences include zero. The smallest exact paired p-value is 0.25. These fixed-shortlist checks do not establish a reliable winner or account for model retraining and future-year drift.",
+        "- Across both test years there are 140 positive provider-year records but only 113 distinct positive NPIs. A supplementary pooled comparison resamples whole NPIs and also finds no reliable model difference; the primary metrics remain separate by year.",
         "- At the cutoffs used for the three models in 2022 and 2023, deterministic tie handling did not change the observed hit counts.",
         "",
-        "## Coverage and operational limits",
+        "## Evaluation pool and upstream coverage",
         "",
-        "| Year | Full eligible pool | Scored by all models | Later exclusions in scored pool | Later exclusions with no score |",
+        "| Year | Upstream eligible candidates | Individual evaluation pool | Positive records in evaluation pool | Positive records outside evaluation pool |",
         "|---|---:|---:|---:|---:|",
     ]
     for row in coverage.itertuples(index=False):
-        lines.append(f"| {row.year} | {row.full_eligible_providers:,} | {row.scored_by_all_three:,} ({row.scored_provider_coverage:.1%}) | {row.scored_pool_later_exclusions} | {row.unscored_later_exclusions} |")
+        lines.append(f"| {row.year} | {row.upstream_eligible_candidates:,} | {row.individual_eval_pool:,} ({row.eval_pool_share_of_upstream_candidates:.1%}) | {row.eval_pool_later_exclusion_records} | {row.upstream_positive_records_outside_eval_pool} |")
     lines += [
         "",
-        "Providers without a score cannot enter any model shortlist. This limits full-pool recall even if every scored provider were reviewed. Shortlist Medicare payment totals describe historical billing exposure only; no audit cost, adjudicated fraud, recoverable payment, or savings measure is available.",
+        "The broader candidate pool includes organisations and is **not** the test denominator. The 4 and 3 positive records outside the individual evaluation pool were not scored because they had no P2 feature row; their entity type is not established here. Within the evaluation pool, score coverage is 100%. Shortlist Medicare payment totals describe historical billing exposure only; no audit cost, adjudicated fraud, recoverable payment, or savings measure is available.",
         "",
         "## Provisional recommendation",
         "",
@@ -201,16 +202,16 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
         "",
         "- [Hits by audit capacity](../presentation_figures/p4_hits_by_k.png)",
         "- [Precision by audit capacity](../presentation_figures/p4_precision_by_k.png)",
-        "- [Scoring coverage](../presentation_figures/p4_scoring_coverage.png)",
+        "- [Evaluation-pool coverage within upstream candidates](../presentation_figures/p4_scoring_coverage.png)",
         "- [P4 PowerPoint section](../presentation_figures/FraudLens_P4_Evaluation.pptx)",
         "- [Interactive dashboard](p4_dashboard.html)",
         "- [Consolidated results](p4_results.csv), [top-K shortlists](p4_top_k_shortlists.csv), [model comparison](p4_model_comparison.csv)",
-        "- [Pairwise uncertainty](p4_model_paired_uncertainty.csv), [random benchmark](p4_seeded_random_baseline.csv), [coverage](p4_scoring_coverage_summary.csv)",
+        "- [Per-year paired uncertainty](p4_model_paired_uncertainty.csv), [NPI-clustered pooled check](p4_pooled_npi_uncertainty.csv), [random benchmark](p4_seeded_random_baseline.csv), [coverage](p4_scoring_coverage_summary.csv)",
         "",
         "## Team confirmation before publication",
         "",
-        "1. P1: confirm Scenario A, two-year outcome windows, and eligibility rules.",
-        "2. P2: confirm that feature-covered individual practitioners represent the intended audit population.",
+        "1. P1's outcome and evaluation-population definitions are confirmed in the team reply. Obtain the actual generated `eval_pool.parquet` if a direct file-to-file key comparison is required; the published construction has already been reconciled exactly.",
+        "2. P2: confirm the final feature file and individual-practitioner filter.",
         "3. P3: confirm score direction and that 2022/2023 outcomes were not used to choose model settings.",
         "4. Audit sponsor: state review capacity or costs so a single K and financial decision rule can be chosen.",
         "",
@@ -221,7 +222,7 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
 def dashboard(results: pd.DataFrame, coverage: pd.DataFrame) -> None:
     model_rows = results.loc[results["approach"].isin(MODELS)].copy()
     data = model_rows[["year", "approach", "K", "hits_at_k", "precision_at_k", "recall_at_k", "lift_at_k"]].to_dict(orient="records")
-    covered = coverage[["year", "scored_provider_coverage", "unscored_later_exclusions"]].to_dict(orient="records")
+    covered = coverage[["year", "individual_eval_pool", "score_coverage_within_eval_pool", "upstream_positive_records_outside_eval_pool"]].to_dict(orient="records")
     page = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FraudLens P4 evaluation</title>
@@ -232,7 +233,7 @@ def dashboard(results: pd.DataFrame, coverage: pd.DataFrame) -> None:
 <div class="controls"><label>Year <select id="year"><option>2022</option><option>2023</option></select></label><label>Top K <select id="k"><option>100</option><option selected>500</option><option>1000</option></select></label></div>
 <div class="card"><h2>Model comparison</h2><table><thead><tr><th>Model</th><th>Hits</th><th>Precision</th><th>Recall</th><th>Lift</th></tr></thead><tbody id="rows"></tbody></table><p id="coverage"></p></div>
 <div class="grid"><div class="card"><h2>Hits by workload</h2><img src="../presentation_figures/p4_hits_by_k.png" alt="Hits by K and year"></div><div class="card"><h2>Precision by workload</h2><img src="../presentation_figures/p4_precision_by_k.png" alt="Precision by K and year"></div></div>
-<div class="card"><h2>Scoring coverage</h2><img src="../presentation_figures/p4_scoring_coverage.png" alt="Share of providers and positives with model scores"></div>
+<div class="card"><h2>Evaluation pool</h2><img src="../presentation_figures/p4_scoring_coverage.png" alt="Share of upstream providers and positive records in the individual evaluation pool"></div>
 <p>Both payment rules found zero hits at the displayed capacities. Random selection almost always found zero. The full analysis and limitations are in <a href="p4_evaluation_summary.md">the evaluation summary</a>.</p>
 </main><script>
 const data=__DATA__; const coverage=__COVERAGE__;
@@ -240,7 +241,7 @@ const names={supervised_lgbm:'LightGBM',supervised_logreg:'Logistic regression',
 function render(){const year=Number(document.getElementById('year').value),k=Number(document.getElementById('k').value);
  const selected=data.filter(r=>r.year===year&&r.K===k); const order=['supervised_lgbm','supervised_logreg','anomaly_iforest'];
  document.getElementById('rows').innerHTML=order.map(a=>{const r=selected.find(x=>x.approach===a);return `<tr><td>${names[a]}</td><td>${r.hits_at_k}</td><td>${(100*r.precision_at_k).toFixed(2)}%</td><td>${(100*r.recall_at_k).toFixed(2)}%</td><td>${r.lift_at_k.toFixed(1)}×</td></tr>`}).join('');
- const c=coverage.find(x=>x.year===year);document.getElementById('coverage').textContent=`${(100*c.scored_provider_coverage).toFixed(1)}% of eligible providers received all three scores; ${c.unscored_later_exclusions} later-excluded providers had no score.`}
+ const c=coverage.find(x=>x.year===year);document.getElementById('coverage').textContent=`The individual evaluation pool has ${c.individual_eval_pool.toLocaleString()} providers; all have three model scores. ${c.upstream_positive_records_outside_eval_pool} positive records are outside this pool and are not part of the test denominator.`}
 document.getElementById('year').addEventListener('change',render);document.getElementById('k').addEventListener('change',render);render();
 </script></body></html>"""
     page = page.replace("__DATA__", json.dumps(data)).replace("__COVERAGE__", json.dumps(covered))
@@ -254,11 +255,14 @@ def main() -> None:
     save_shortlists()
     comparison = pd.read_csv(REPORTS / "p4_model_shortlist_comparison.csv")
     paired = pd.read_csv(REPORTS / "p4_model_paired_uncertainty.csv")
+    pooled = pd.read_csv(REPORTS / "p4_pooled_npi_uncertainty.csv")
     coverage = pd.read_csv(REPORTS / "p4_scoring_coverage_summary.csv")
-    if len(comparison) != 6 or len(paired) != 18 or len(coverage) != 2:
+    if len(comparison) != 6 or len(paired) != 18 or len(pooled) != 9 or len(coverage) != 2:
         raise ValueError("Missing comparison, paired, or coverage results")
     if not ((paired["hit_difference_bootstrap_ci95_low"] <= 0) & (paired["hit_difference_bootstrap_ci95_high"] >= 0)).all():
         raise ValueError("Report text about uncertainty needs revision")
+    if not ((pooled["provider_cluster_bootstrap_ci95_low"] <= 0) & (pooled["provider_cluster_bootstrap_ci95_high"] >= 0)).all():
+        raise ValueError("Pooled NPI uncertainty text needs revision")
     comparison.to_csv(REPORTS / "p4_model_comparison.csv", index=False)
     chart_lines(results, "hits_at_k", "Later exclusions in top-K shortlists", "Hits", "p4_hits_by_k.png")
     chart_lines(results, "precision_at_k", "Audit-list yield by capacity", "Precision@K", "p4_precision_by_k.png", percentage=True)

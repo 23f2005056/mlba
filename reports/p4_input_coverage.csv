@@ -1,3 +1,3 @@
-year,eligible_candidates,eligible_positives,censored_candidates,uncensored_candidates,uncensored_positives,with_features,positives_with_features,with_all_three_scores,positives_with_all_three_scores
-2022,1230281,86,0,1230281,86,1165640,82,1165640,82
-2023,1259333,61,0,1259333,61,1196525,58,1196525,58
+year,eligible_candidates,eligible_positives,censored_candidates,uncensored_candidates,uncensored_positives,with_features,positives_with_features,with_all_three_scores,positives_with_all_three_scores,eval_pool_source,eval_pool_rows,eval_pool_positives,score_coverage_of_eval_pool,upstream_positives_outside_eval_pool
+2022,1230281,86,0,1230281,86,1165640,82,1165640,82,reconstructed_from_eligible_labels_and_individual_features,1165640,82,1.0,4
+2023,1259333,61,0,1259333,61,1196525,58,1196525,58,reconstructed_from_eligible_labels_and_individual_features,1196525,58,1.0,3

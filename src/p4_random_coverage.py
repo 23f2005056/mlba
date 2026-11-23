@@ -1,7 +1,7 @@
-"""Simulate seeded random audit shortlists and summarize scoring coverage.
+"""Simulate random lists on P1's individual evaluation pool and report upstream coverage.
 
-Random lists use the same scored common pool and nested K values as the P3
-models. Coverage separately describes P1's full eligible provider pool.
+Random lists use the same individual evaluation pool and nested K values as
+the P3 models. Coverage separately describes P1's broader upstream pool.
 """
 
 from __future__ import annotations
@@ -44,19 +44,23 @@ def main() -> None:
         full_p = int(cover["eligible_positives"])
         if n != int(cover["with_all_three_scores"]) or p != int(cover["positives_with_all_three_scores"]):
             raise ValueError(f"{year}: coverage does not match common cohort")
+        if n != int(cover["eval_pool_rows"]) or p != int(cover["eval_pool_positives"]):
+            raise ValueError(f"{year}: scored cohort differs from P1's individual eval_pool")
         if full_n < n or full_p < p or max(KS) > n:
             raise ValueError(f"{year}: invalid coverage counts")
         coverage_rows.append({
             "year": year,
-            "full_eligible_providers": full_n,
-            "full_eligible_later_exclusions": full_p,
-            "scored_by_all_three": n,
-            "scored_pool_later_exclusions": p,
-            "scored_provider_coverage": n / full_n,
-            "unscored_eligible_providers": full_n - n,
-            "unscored_later_exclusions": full_p - p,
-            "maximum_full_pool_recall_from_scored_candidates": p / full_p,
+            "upstream_eligible_candidates": full_n,
+            "upstream_later_exclusion_records": full_p,
+            "individual_eval_pool": n,
+            "eval_pool_later_exclusion_records": p,
+            "eval_pool_share_of_upstream_candidates": n / full_n,
+            "score_coverage_within_eval_pool": n / int(cover["eval_pool_rows"]),
+            "upstream_candidates_outside_eval_pool": full_n - n,
+            "upstream_positive_records_outside_eval_pool": full_p - p,
+            "eval_pool_positive_share_of_upstream": p / full_p,
             "censored_candidates": int(cover["censored_candidates"]),
+            "eval_pool_source": cover["eval_pool_source"],
         })
 
         labels = cohort["y_A_h2"].to_numpy(dtype=np.int8)
@@ -110,7 +114,7 @@ def main() -> None:
     pd.concat(example_lists, ignore_index=True).to_csv(DATA / "topk_seeded_random_example.csv", index=False)
     print(random[["year", "K", "mean_hits_at_k", "sd_hits_at_k", "fraction_with_zero_hits", "exact_expected_hits_at_k"]].to_string(index=False))
     print(cover_summary.to_string(index=False))
-    print("Saved random baseline and scoring coverage reports")
+    print("Saved random baseline and evaluation-pool coverage reports")
 
 
 if __name__ == "__main__":

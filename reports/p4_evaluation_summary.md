@@ -1,12 +1,12 @@
 # FraudLens P4 evaluation summary
 
-**Status: provisional.** This report uses held-out 2022 and 2023 provider-year cohorts. The team still needs to confirm the outcome, candidate population, and score-direction/test-split handoff before publication.
+**Status: provisional.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P2 and P3 handoff confirmations remain before final publication.
 
 ## Decision evaluated
 
 At the end of a reporting year, rank eligible providers for audit. A hit is a provider with a later Scenario A LEIE exclusion within the two-year label window (`y_A_h2`). This is a proxy for audit prioritisation, not proven billing fraud or a measured recovery.
 
-Every model and baseline uses the same scored pool within each year. K = 100, 500, and 1,000 are audit-capacity scenarios, not an operationally selected capacity. The 2020 data was used for validation, not for this held-out table.
+Every model and baseline uses the same P1 evaluation pool within each year: eligible individuals with P2 features. P1's `eval_pool.parquet` was not supplied locally, so P4 reconstructed its published rule from labels and feature keys; the reconstructed keys exactly match P4's test cohorts. All providers in this pool have all three scores. K = 100, 500, and 1,000 are audit-capacity scenarios, not an operationally selected capacity. The 2020 data was used for validation, not for this held-out table.
 
 ## Held-out results
 
@@ -30,16 +30,17 @@ The payment baselines found zero hits at every displayed capacity. The seeded ra
 - In 2022, LightGBM found 3 hits at K=500 versus 2 for logistic regression and 0 for Isolation Forest. Logistic regression's 2 hits were already on LightGBM's list.
 - In 2023, Isolation Forest found 1 hit at K=500 while the supervised models found 0. At K=1,000, LightGBM and Isolation Forest each found 1, but they were different providers.
 - All 18 paired 95% bootstrap intervals for model hit differences include zero. The smallest exact paired p-value is 0.25. These fixed-shortlist checks do not establish a reliable winner or account for model retraining and future-year drift.
+- Across both test years there are 140 positive provider-year records but only 113 distinct positive NPIs. A supplementary pooled comparison resamples whole NPIs and also finds no reliable model difference; the primary metrics remain separate by year.
 - At the cutoffs used for the three models in 2022 and 2023, deterministic tie handling did not change the observed hit counts.
 
-## Coverage and operational limits
+## Evaluation pool and upstream coverage
 
-| Year | Full eligible pool | Scored by all models | Later exclusions in scored pool | Later exclusions with no score |
+| Year | Upstream eligible candidates | Individual evaluation pool | Positive records in evaluation pool | Positive records outside evaluation pool |
 |---|---:|---:|---:|---:|
 | 2022 | 1,230,281 | 1,165,640 (94.7%) | 82 | 4 |
 | 2023 | 1,259,333 | 1,196,525 (95.0%) | 58 | 3 |
 
-Providers without a score cannot enter any model shortlist. This limits full-pool recall even if every scored provider were reviewed. Shortlist Medicare payment totals describe historical billing exposure only; no audit cost, adjudicated fraud, recoverable payment, or savings measure is available.
+The broader candidate pool includes organisations and is **not** the test denominator. The 4 and 3 positive records outside the individual evaluation pool were not scored because they had no P2 feature row; their entity type is not established here. Within the evaluation pool, score coverage is 100%. Shortlist Medicare payment totals describe historical billing exposure only; no audit cost, adjudicated fraud, recoverable payment, or savings measure is available.
 
 ## Provisional recommendation
 
@@ -51,15 +52,15 @@ A prospective pilot should record audited providers, confirmed findings, audit c
 
 - [Hits by audit capacity](../presentation_figures/p4_hits_by_k.png)
 - [Precision by audit capacity](../presentation_figures/p4_precision_by_k.png)
-- [Scoring coverage](../presentation_figures/p4_scoring_coverage.png)
+- [Evaluation-pool coverage within upstream candidates](../presentation_figures/p4_scoring_coverage.png)
 - [P4 PowerPoint section](../presentation_figures/FraudLens_P4_Evaluation.pptx)
 - [Interactive dashboard](p4_dashboard.html)
 - [Consolidated results](p4_results.csv), [top-K shortlists](p4_top_k_shortlists.csv), [model comparison](p4_model_comparison.csv)
-- [Pairwise uncertainty](p4_model_paired_uncertainty.csv), [random benchmark](p4_seeded_random_baseline.csv), [coverage](p4_scoring_coverage_summary.csv)
+- [Per-year paired uncertainty](p4_model_paired_uncertainty.csv), [NPI-clustered pooled check](p4_pooled_npi_uncertainty.csv), [random benchmark](p4_seeded_random_baseline.csv), [coverage](p4_scoring_coverage_summary.csv)
 
 ## Team confirmation before publication
 
-1. P1: confirm Scenario A, two-year outcome windows, and eligibility rules.
-2. P2: confirm that feature-covered individual practitioners represent the intended audit population.
+1. P1's outcome and evaluation-population definitions are confirmed in the team reply. Obtain the actual generated `eval_pool.parquet` if a direct file-to-file key comparison is required; the published construction has already been reconciled exactly.
+2. P2: confirm the final feature file and individual-practitioner filter.
 3. P3: confirm score direction and that 2022/2023 outcomes were not used to choose model settings.
 4. Audit sponsor: state review capacity or costs so a single K and financial decision rule can be chosen.

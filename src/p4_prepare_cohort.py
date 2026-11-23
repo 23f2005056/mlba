@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 INPUT = ROOT / "stubs"
 OUTPUT = ROOT / "out" / "p4"
 REPORT = ROOT / "reports" / "p4_input_coverage.csv"
+P1_EVAL_POOL_PATHS = (ROOT / "stubs" / "eval_pool.parquet", ROOT / "out" / "eval_pool.parquet")
 TEST_YEARS = (2022, 2023)
 APPROACHES = ("supervised_lgbm", "supervised_logreg", "anomaly_iforest")
 KEY = ["npi", "year"]
@@ -41,6 +42,14 @@ def check_keys(frame: pd.DataFrame, name: str, keys: list[str]) -> None:
         raise ValueError(f"{name}: duplicate {keys}")
     if not frame["npi"].astype("string").str.fullmatch(r"\d{10}").all():
         raise ValueError(f"{name}: NPI must be a ten-digit string")
+
+
+def same_keys(left: pd.DataFrame, right: pd.DataFrame) -> bool:
+    return (
+        len(left) == len(right)
+        and np.array_equal(left["npi"].astype("string").to_numpy(), right["npi"].astype("string").to_numpy())
+        and np.array_equal(left["year"].to_numpy(), right["year"].to_numpy())
+    )
 
 
 def prepare_year(year: int) -> dict[str, int]:
@@ -70,6 +79,24 @@ def prepare_year(year: int) -> dict[str, int]:
         raise ValueError("predictions: unexpected or missing approach")
     if not np.isfinite(predictions["score"].to_numpy()).all():
         raise ValueError("predictions: non-finite score")
+
+    # P1 defines eval_pool as eligible label rows with a P2 feature row.
+    # P2's feature builder retains only individual practitioners. The wider
+    # candidate_pool is retained for upstream coverage, not as the test metric
+    # denominator. Reconstruct P1's rule when their generated file is absent.
+    eval_pool = labels.loc[labels["eligible"], KEY].merge(
+        features[KEY], on=KEY, how="inner", validate="one_to_one"
+    ).sort_values(KEY).reset_index(drop=True)
+    actual_pool = next((path for path in P1_EVAL_POOL_PATHS if path.is_file()), None)
+    if actual_pool is not None:
+        supplied = pd.read_parquet(actual_pool, columns=KEY, filters=[("year", "==", year)])
+        check_keys(supplied, "P1 eval_pool", KEY)
+        supplied = supplied.sort_values(KEY).reset_index(drop=True)
+        if not same_keys(supplied, eval_pool):
+            raise ValueError(f"{year}: supplied P1 eval_pool differs from P1's published construction")
+        pool_source = str(actual_pool.relative_to(ROOT))
+    else:
+        pool_source = "reconstructed_from_eligible_labels_and_individual_features"
 
     pool = candidates.merge(labels, on=KEY, how="left", validate="one_to_one", indicator=True)
     if not pool["_merge"].eq("both").all():
@@ -114,6 +141,8 @@ def prepare_year(year: int) -> dict[str, int]:
     if not np.isfinite(common[score_columns].to_numpy()).all():
         raise ValueError(f"{year}: non-finite common-pool score")
     common = common.sort_values("npi").reset_index(drop=True)
+    if not same_keys(common, eval_pool):
+        raise ValueError(f"{year}: scored cohort does not cover all of P1's individual eval_pool")
 
     OUTPUT.mkdir(parents=True, exist_ok=True)
     destination = OUTPUT / f"cohort_{year}.parquet"
@@ -130,6 +159,11 @@ def prepare_year(year: int) -> dict[str, int]:
         "positives_with_features": positives_with_features,
         "with_all_three_scores": len(common),
         "positives_with_all_three_scores": int(common["y_A_h2"].sum()),
+        "eval_pool_source": pool_source,
+        "eval_pool_rows": len(eval_pool),
+        "eval_pool_positives": positives_with_features,
+        "score_coverage_of_eval_pool": len(common) / len(eval_pool),
+        "upstream_positives_outside_eval_pool": full_positives - positives_with_features,
     }
     print(f"{year}: {result}")
     print(f"Saved {destination}")
