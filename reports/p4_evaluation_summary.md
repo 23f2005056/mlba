@@ -1,6 +1,6 @@
 # FraudLens P4 evaluation summary
 
-**Status: provisional.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. P2's final feature handoff and an operational audit capacity remain to be confirmed.
+**Status: provisional pending P2 feature-file confirmation.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. The team supplied no fixed audit budget or cost, so P4 reports audit yield at all three K values without selecting one.
 
 ## Decision evaluated
 
@@ -69,4 +69,4 @@ A prospective pilot should record audited providers, confirmed findings, audit c
 1. P1's outcome and evaluation-population definitions are confirmed in the team reply. Obtain the actual generated `eval_pool.parquet` if a direct file-to-file key comparison is required; the published construction has already been reconciled exactly.
 2. P2: confirm the final feature file and individual-practitioner filter.
 3. P3's score direction, 2020-only selection and mature training-year split are confirmed. If predictions change, revalidate that handoff before rerunning P4.
-4. Audit sponsor: state review capacity or costs so a single K and financial decision rule can be chosen.
+4. The team requested audit-yield reporting without a fixed budget or cost. P4 has completed that comparison; a future operational sponsor would need to state capacity or costs before selecting one K.

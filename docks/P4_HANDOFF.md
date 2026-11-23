@@ -63,6 +63,6 @@ The 2020 capacity exploration is a separate validation-only check in `src/p4_com
 
 The 64,641 (2022) and 62,808 (2023) upstream eligible rows without features/scores are reported separately, with 4 and 3 positive records. Under P1's definition they are outside the individual evaluation denominator, so they do not enter primary Recall@K.
 
-**Audit sponsor or team:** State the number of audits possible, or an audit cost and value rule, before selecting one K. No observed audit costs, confirmed findings or recoveries are available, so the project cannot claim monetary savings.
+**Audit capacity:** The team supplied no fixed budget or cost and requested audit-yield metrics. P4 therefore reports K = 100, 500 and 1,000 without selecting a single operational K. If an audit sponsor later needs one shortlist size, it must provide review capacity or an audit cost/value rule. No observed audit costs, confirmed findings or recoveries are available, so the project cannot claim monetary savings.
 
-Until P2 and audit-capacity confirmations arrive, the evaluation report and deck remain **provisional**. The historical test hit counts are descriptive; paired uncertainty does not establish a reliable winner.
+Until P2 confirms the final feature file, the evaluation report and deck remain **provisional**. The historical test hit counts are descriptive; paired uncertainty does not establish a reliable winner.

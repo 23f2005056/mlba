@@ -152,7 +152,7 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
     lines = [
         "# FraudLens P4 evaluation summary",
         "",
-        "**Status: provisional.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. P2's final feature handoff and an operational audit capacity remain to be confirmed.",
+        "**Status: provisional pending P2 feature-file confirmation.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. The team supplied no fixed audit budget or cost, so P4 reports audit yield at all three K values without selecting one.",
         "",
         "## Decision evaluated",
         "",
@@ -219,7 +219,7 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
         "1. P1's outcome and evaluation-population definitions are confirmed in the team reply. Obtain the actual generated `eval_pool.parquet` if a direct file-to-file key comparison is required; the published construction has already been reconciled exactly.",
         "2. P2: confirm the final feature file and individual-practitioner filter.",
         "3. P3's score direction, 2020-only selection and mature training-year split are confirmed. If predictions change, revalidate that handoff before rerunning P4.",
-        "4. Audit sponsor: state review capacity or costs so a single K and financial decision rule can be chosen.",
+        "4. The team requested audit-yield reporting without a fixed budget or cost. P4 has completed that comparison; a future operational sponsor would need to state capacity or costs before selecting one K.",
         "",
     ]
     (REPORTS / "p4_evaluation_summary.md").write_text("\n".join(lines), encoding="utf-8")
@@ -235,7 +235,7 @@ def dashboard(results: pd.DataFrame, coverage: pd.DataFrame) -> None:
 <style>body{font:16px/1.5 system-ui,Arial,sans-serif;color:#183047;background:#f4f7fa;margin:0}main{max-width:1100px;margin:auto;padding:28px}h1{margin-bottom:5px}p{max-width:850px}.note{background:#fff4d6;border-left:4px solid #db9b20;padding:12px 16px}.controls{display:flex;gap:16px;margin:24px 0}label{font-weight:600}select{font:inherit;padding:7px;margin-left:8px}table{border-collapse:collapse;width:100%;background:white}th,td{padding:11px;border-bottom:1px solid #dce3eb;text-align:left}th{background:#dceafa}.card{background:white;padding:18px;border-radius:9px;box-shadow:0 1px 4px #ced8e2;margin:18px 0}img{max-width:100%;height:auto}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}@media(max-width:760px){.grid{grid-template-columns:1fr}}</style>
 </head><body><main><h1>FraudLens audit-priority evaluation</h1>
 <p>Held-out 2022 and 2023 results. A hit means a provider later appeared in the two-year Scenario A exclusion label. It is not confirmed fraud or money saved. Isolation Forest ranks unusual decision-year billing without using exclusion labels.</p>
-<div class="note"><strong>Provisional:</strong> Model differences are uncertain. K is an audit workload scenario; no audit capacity or financial value rule has been supplied.</div>
+<div class="note"><strong>Provisional pending P2:</strong> Model differences are uncertain. The team supplied no fixed audit budget or cost, so all three K values are shown.</div>
 <div class="controls"><label>Year <select id="year"><option>2022</option><option>2023</option></select></label><label>Top K <select id="k"><option>100</option><option selected>500</option><option>1000</option></select></label></div>
 <div class="card"><h2>Model comparison</h2><table><thead><tr><th>Model</th><th>Hits</th><th>Precision</th><th>Recall</th><th>Lift</th></tr></thead><tbody id="rows"></tbody></table><p id="coverage"></p></div>
 <div class="grid"><div class="card"><h2>Hits by workload</h2><img src="../presentation_figures/p4_hits_by_k.png" alt="Hits by K and year"></div><div class="card"><h2>Precision by workload</h2><img src="../presentation_figures/p4_precision_by_k.png" alt="Precision by K and year"></div></div>

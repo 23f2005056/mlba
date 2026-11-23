@@ -1,6 +1,6 @@
 # FraudLens P4 evaluation protocol
 
-Status: **provisional pending P2 confirmation and audit capacity**. P1 confirmed the primary
+Status: **provisional pending P2 confirmation**. P1 confirmed the primary
 outcome, uncensored test windows, and individual-practitioner evaluation pool.
 P3 confirmed the prediction handoff, higher-is-higher priority score direction,
 and validation-only model selection on 2020.
@@ -8,8 +8,8 @@ This document records the rules
 used for the held-out P4 test results in `reports/p4_evaluation_summary.md`.
 The outcome, test years, and score direction
 follow the real files and P3's prediction handoff. No single primary audit
-capacity has been established; P2's final feature handoff remains to be
-confirmed. All rows in
+capacity has been established, so P4 reports all three K values without
+selecting one. P2's final feature handoff remains to be confirmed. All rows in
 the individual evaluation pool have all three model scores.
 
 ## Decision and outcome
@@ -127,9 +127,10 @@ optimal without a capacity or cost/value decision rule.
 
 ## Remaining decisions and handoff checks
 
-1. **Audit capacity `K`:** evaluate `100`, `500`, and `1000` equally for all
-   approaches. A single operational capacity remains unselected because no
-   audit budget or cost/value rule has been supplied.
+1. **Audit capacity `K`:** the team supplied no fixed budget or cost and asked
+   for audit-yield comparisons. P4 evaluates `100`, `500`, and `1000` equally
+   for all approaches and leaves operational K unselected. This is the agreed
+   reporting approach, not an unresolved P4 computation.
 2. **P2 handoff:** confirm that the final feature file follows the
    individual-practitioner filter in the feature-building code.
 3. **P1 file:** if available, provide the generated `eval_pool.parquet` for a
