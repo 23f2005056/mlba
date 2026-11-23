@@ -44,7 +44,7 @@ the individual evaluation pool have all three model scores.
 | `stubs/candidate_pool.parquet` | `npi`, `year` | Broader upstream eligible candidates, including organisations; not the primary test denominator |
 | `eval_pool.parquet` (P1 handoff) | `npi`, `year` | Final individual-practitioner evaluation denominator; reconstructed from eligible labels and P2 feature keys until the actual file is supplied |
 | `stubs/labels.parquet` | `npi`, `year`, `eligible`, `y_A_h2`, `censored_h2` | Outcome and observability |
-| `stubs/provider_features.parquet` | `npi`, `year`, `medicare_payment`, `pymt_per_bene`, `specialty` | Baselines and shortlist context |
+| `stubs/provider_features.parquet` | `npi`, `year`, `medicare_payment`, `pymt_per_bene`, `pymt_per_bene_peer_z`, `srvcs_per_bene_peer_z`, `specialty` | Raw payment and P1 peer baselines; shortlist context |
 | `stubs/predictions.parquet` | `NPI`, `year`, `approach`, `score` | Model rankings; rename `NPI` to `npi` for joining |
 
 Keep NPI as a ten-digit string and year as an integer. The key for candidates,
@@ -79,7 +79,9 @@ generator against these paths.
 
 - Payment baselines: descending `medicare_payment` (total-payment volume) and
   descending `pymt_per_bene` (payment per beneficiary) from P2's feature
-  table, as confirmed by P2. Use ascending `npi` as a
+  table, as confirmed by P2. P1's additional peer baselines use descending
+  `pymt_per_bene_peer_z` and `srvcs_per_bene_peer_z`; missing values are placed
+  at the observed minimum as in P1's baseline script. Use ascending `npi` as a
   deterministic tie-breaker for **every** ranking, including model scores.
   This fixed NPI order is P4's tie rule; it does not depend on outcomes.
 - Random baseline: generate reproducible seeded random shortlists on the same
@@ -104,6 +106,15 @@ generator against these paths.
 - Keep 2022 and 2023 primary metrics separate. The combined 140 positive
   provider-year records correspond to 113 distinct NPIs. Any supplementary
   two-year bootstrap resamples whole NPIs so repeated providers stay together.
+- Reconcile P1's independent ROC-AUC and Recall@1%/5% by sorting each year's
+  full evaluation pool, taking `ceil(q × N)` rows for q = 0.01 and 0.05, and
+  reporting cutoff-tie hit bounds. At 2022 LightGBM 1%, a 77-provider tie
+  straddles the cutoff: P1's 18 and P4's 19 hits are both within the bound.
+- For percentage-cutoff uncertainty, resample the same 113 outcome-positive
+  NPIs across both years, retaining repeated provider records together. The
+  paired bootstrap uses 20,000 shared draws. AUC bootstrap contributions use
+  the fixed observed negative-score distribution, so the resulting intervals
+  do not cover negative sampling, model retraining, or future-year drift.
 
 ## Audit capacity exploration on 2020 validation
 
@@ -145,7 +156,8 @@ optimal without a capacity or cost/value decision rule.
    training-year split are confirmed in the team handoff. Keep that contract
    fixed if predictions are regenerated.
 
-The P4 evaluation is complete. The P1 file comparison is optional because its
-published key rule and counts already reconcile. The pilot recommendation is
-not an operational model or budget decision. Changes to the outcome horizon
-require matching predictions from P3.
+The P4 evaluation and P1's additional metric reconciliation are complete,
+subject to confirming P1's exact 2022 LightGBM 1% tie convention. The P1 file
+comparison is optional because its published key rule and counts already
+reconcile. The pilot recommendation is not an operational model or budget
+decision. Changes to the outcome horizon require matching predictions from P3.

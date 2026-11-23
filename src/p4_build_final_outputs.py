@@ -22,7 +22,9 @@ REPORTS = ROOT / "reports"
 DATA = ROOT / "out" / "p4"
 FIGURES = ROOT / "presentation_figures"
 MODELS = ("supervised_lgbm", "supervised_logreg", "anomaly_iforest")
-BASELINES = ("highest_total_payment", "highest_payment_per_beneficiary")
+PAYMENT_BASELINES = ("highest_total_payment", "highest_payment_per_beneficiary")
+PEER_BASELINES = ("p1_baseline_pymt_per_bene_peer_z", "p1_baseline_srvcs_per_bene_peer_z")
+BASELINES = PAYMENT_BASELINES + PEER_BASELINES
 YEARS = (2022, 2023)
 KS = (100, 500, 1000)
 NAMES = {
@@ -31,6 +33,8 @@ NAMES = {
     "anomaly_iforest": "Isolation Forest",
     "highest_total_payment": "Highest total payment",
     "highest_payment_per_beneficiary": "Highest payment per beneficiary",
+    "p1_baseline_pymt_per_bene_peer_z": "P1 peer-adjusted payment per beneficiary",
+    "p1_baseline_srvcs_per_bene_peer_z": "P1 peer-adjusted services per beneficiary",
     "random_expected": "Random expectation",
 }
 COLORS = {
@@ -55,13 +59,16 @@ def load_results() -> pd.DataFrame:
     model["estimate_type"] = "observed"
     baseline = pd.read_csv(REPORTS / "p4_baseline_topk_metrics.csv")
     baseline["estimate_type"] = np.where(baseline["approach"].eq("random_expected"), "random_expectation", "observed")
+    peer = pd.read_csv(REPORTS / "p4_p1_peer_baseline_topk.csv")
+    peer["estimate_type"] = "observed"
     require_complete(model, MODELS)
-    require_complete(baseline, BASELINES + ("random_expected",))
+    require_complete(baseline, PAYMENT_BASELINES + ("random_expected",))
+    require_complete(peer, PEER_BASELINES)
     columns = [
         "year", "approach", "K", "pool_size", "positive_count", "estimate_type",
         "hits_at_k", "precision_at_k", "recall_at_k", "lift_at_k", "audits_per_hit",
     ]
-    results = pd.concat([model[columns], baseline[columns]], ignore_index=True)
+    results = pd.concat([model[columns], baseline[columns], peer[columns]], ignore_index=True)
     for (year, k), group in results.groupby(["year", "K"]):
         if group["pool_size"].nunique() != 1 or group["positive_count"].nunique() != 1:
             raise ValueError(f"Unequal evaluation populations for {year}, K={k}")
@@ -78,6 +85,9 @@ def save_shortlists() -> None:
     payment = pd.read_csv(DATA / "topk_payment_baselines.csv", dtype={"npi": "string"})
     payment["selection_type"] = "payment_baseline"
     frames.append(payment[["year", "approach", "K", "rank", "npi", "ranking_value", "selection_type"]])
+    peer = pd.read_csv(DATA / "topk_p1_peer_baselines.csv", dtype={"npi": "string"})
+    peer["selection_type"] = "p1_peer_baseline"
+    frames.append(peer[["year", "approach", "K", "rank", "npi", "ranking_value", "selection_type"]])
     random = pd.read_csv(DATA / "topk_seeded_random_example.csv", dtype={"npi": "string"})
     random["approach"] = "random_example"
     random["ranking_value"] = np.nan
@@ -105,7 +115,13 @@ def chart_lines(results: pd.DataFrame, field: str, title: str, ylabel: str, file
         ax.plot(rows["K"], rows[field], linestyle=":", linewidth=1.8, color="#555555", label="Random expectation")
         # Both payment rules have zero hits at each displayed K.
         rows = yearly.loc[yearly["approach"].eq("highest_total_payment")].sort_values("K")
-        ax.plot(rows["K"], rows[field], linestyle="--", linewidth=1.5, color="#a458a8", label="Payment rules (both)")
+        ax.plot(rows["K"], rows[field], linestyle="--", linewidth=1.5, color="#a458a8", label="Raw payment rules (both)")
+        for baseline, color, label in (
+            (PEER_BASELINES[0], "#8559b8", "Peer payment/beneficiary"),
+            (PEER_BASELINES[1], "#ae547e", "Peer services/beneficiary"),
+        ):
+            rows = yearly.loc[yearly["approach"].eq(baseline)].sort_values("K")
+            ax.plot(rows["K"], rows[field], linestyle="-.", linewidth=1.5, color=color, label=label)
         ax.set_title(str(year), fontsize=13, fontweight="bold")
         ax.set_xticks(KS)
         ax.set_xlabel("Audit shortlist size (K)")
@@ -117,9 +133,9 @@ def chart_lines(results: pd.DataFrame, field: str, title: str, ylabel: str, file
         else:
             ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, -0.02), ncol=3, frameon=False)
+    fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, -0.02), ncol=4, frameon=False)
     fig.suptitle(title, fontsize=15, fontweight="bold")
-    fig.tight_layout(rect=(0, 0.11, 1, 0.94))
+    fig.tight_layout(rect=(0, 0.17, 1, 0.94))
     fig.savefig(FIGURES / filename, dpi=180, bbox_inches="tight")
     plt.close(fig)
 
@@ -149,10 +165,14 @@ def chart_coverage(coverage: pd.DataFrame) -> None:
 
 
 def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: pd.DataFrame, paired: pd.DataFrame) -> None:
+    percent = pd.read_csv(REPORTS / "p4_p1_percentage_reconciliation.csv")
+    percent_pairs = pd.read_csv(REPORTS / "p4_p1_percentage_paired_bootstrap.csv")
+    if len(percent) != 10 or len(percent_pairs) != 27:
+        raise ValueError("Missing P1 percentage-cutoff reconciliation")
     lines = [
         "# FraudLens P4 evaluation summary",
         "",
-        "**Status: P4 evaluation complete; P1, P2 and P3 handoffs confirmed.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P2 confirmed the individual-practitioner feature file and both payment baseline fields. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. The team supplied no fixed audit budget or cost, so P4 reports audit yield at all three K values without selecting one.",
+        "**Status: P4 calculations complete; P1, P2 and P3 handoffs confirmed.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P2 confirmed the individual-practitioner feature file and both payment baseline fields. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. P1's additional independent metrics reconcile except for one tie-dependent 1% cutoff, whose exact convention awaits P1's confirmation. The team supplied no fixed audit budget or cost, so P4 reports audit yield at all three K values without selecting one.",
         "",
         "## Decision evaluated",
         "",
@@ -164,7 +184,7 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
         "",
         "LightGBM and logistic regression scores are predicted probabilities of later exclusion. Isolation Forest is fitted separately to each decision year's billing features, which P3 says are available at the decision date, without exclusion labels. Its anomaly score was negated so more unusual billing ranks higher; that score is not a probability. P3 chose supervised settings on 2020 validation only, kept Isolation Forest settings fixed, and used matured labels from 2013–2020 for the supervised 2022 models and 2013–2021 for the supervised 2023 models. P3 confirms neither test year was used to choose model settings.",
         "",
-        "Every ranking sorts by score descending, then NPI ascending when scores tie. This fixed tie rule uses no outcome information. P3 reports that final LightGBM has 13 trees, so tied scores can occur. P4 checked the minimum and maximum possible hit counts across cutoff tie orders; all held-out 2022/2023 cutoffs have the same hit count under every tie order. The large 2020 validation ties remain a separate sensitivity issue and did not determine K.",
+        "Every ranking sorts by score descending, then NPI ascending when scores tie. This fixed tie rule uses no outcome information. P3 reports that final LightGBM has 13 trees, so tied scores can occur. P4 checked the minimum and maximum possible hit counts across cutoff tie orders. At fixed K=100/500/1,000, the held-out hit counts do not depend on tie order; at 2022's 1% cutoff, the LightGBM hit count can be 18 or 19. The large 2020 validation ties remain a separate sensitivity issue and did not determine K.",
         "",
         "## Held-out results",
         "",
@@ -177,13 +197,30 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
             lines.append(f"| {year} | {NAMES[method]} | {int(row.loc[100, 'hits_at_k'])} | {int(row.loc[500, 'hits_at_k'])} | {int(row.loc[1000, 'hits_at_k'])} |")
     lines += [
         "",
-        "The payment baselines found zero hits at every displayed capacity. The seeded random shortlists also found zero in most individual draws; their expected hit count is below 0.1 even at K=1,000. The results CSV contains precision, recall, lift, and audits per hit for each method and capacity.",
+        "The two raw-payment baselines found zero hits at every displayed capacity. P1's peer-adjusted services-per-beneficiary baseline found one 2022 hit at each K; its peer-adjusted payment-per-beneficiary baseline found none. The seeded random shortlists found zero in most individual draws; their expected hit count is below 0.1 even at K=1,000. The results CSV contains precision, recall, lift, and audits per hit for every method and capacity.",
+        "",
+        "## Reconciliation with P1's independent 1% and 5% evaluation",
+        "",
+        "P1's cutoffs inspect much larger lists than fixed K: the top 1% selects 11,657 providers in 2022 and 11,966 in 2023; the top 5% selects 58,282 and 59,827. P4 uses exactly `ceil(share × evaluation-pool size)` rows and its fixed score-descending/NPI-ascending tie rule. ROC-AUC uses all scored rows. The two additional P1 baselines rank peer-standardised payment per beneficiary and services per beneficiary; missing peer scores are placed at the observed minimum, matching P1's baseline script.",
+        "",
+        "| Year | Approach | ROC-AUC | Recall@1% | Recall@5% |",
+        "|---|---|---:|---:|---:|",
+    ]
+    for row in percent.sort_values(["year", "approach"]).itertuples(index=False):
+        lines.append(f"| {row.year} | {NAMES[row.approach]} | {row.roc_auc:.3f} | {row.recall_1pct:.1%} ({row.hits_1pct}/{row.positive_count}) | {row.recall_5pct:.1%} ({row.hits_5pct}/{row.positive_count}) |")
+    lines += [
+        "",
+        "All P1 AUCs and 1%/5% recalls reconcile after rounding except 2022 LightGBM Recall@1%: P1 reported 18/82 = 22.0%, while the fixed NPI tie rule selects 19/82 = 23.2%. The cutoff splits a 77-provider equal-score group, of which 49 are selected and one has a positive label. Either 18 or 19 hits is possible under a different within-tie order. This is a tie convention, not a population or model-score mismatch. Its Recall@5% agrees at 33/82 = 40.2%.",
+        "",
+        "For these broader cutoffs, P4 resampled the same 113 distinct positive NPIs 20,000 times across both years, retaining every record of a sampled NPI together. The paired bootstrap intervals for LightGBM minus logistic regression include zero for year-weighted AUC, Recall@1%, and Recall@5% across both years. Thus the broader-cutoff evidence does not establish either supervised model as the unique winner. Some pooled supervised-versus-Isolation-Forest intervals exclude zero, conditional on the observed negative scores and fixed rankings. These intervals do not account for negative-provider sampling, retraining, or future-year drift.",
+        "",
+        "The supplemental pooled AUC is the positive-record-weighted average of the two year-specific AUCs, not a ROC-AUC from mixing scores across years. The primary results remain separate by year.",
         "",
         "## What the comparison shows",
         "",
         "- In 2022, LightGBM found 3 hits at K=500 versus 2 for logistic regression and 0 for Isolation Forest. Logistic regression's 2 hits were already on LightGBM's list.",
         "- In 2023, Isolation Forest found 1 hit at K=500 while the supervised models found 0. At K=1,000, LightGBM and Isolation Forest each found 1, but they were different providers.",
-        "- All 18 paired 95% bootstrap intervals for model hit differences include zero. The smallest exact paired p-value is 0.25. These fixed-shortlist checks do not establish a reliable winner or account for model retraining and future-year drift.",
+        "- All 18 paired 95% bootstrap intervals for fixed-K model hit differences include zero. The smallest exact paired p-value is 0.25. These narrow-shortlist checks do not establish a reliable winner or account for model retraining and future-year drift.",
         "- Across both test years there are 140 positive provider-year records but only 113 distinct positive NPIs. A supplementary pooled comparison resamples whole NPIs and also finds no reliable model difference; the primary metrics remain separate by year.",
         "- At the cutoffs used for the three models in 2022 and 2023, alternative ordering within tied scores would not change the observed hit counts.",
         "",
@@ -200,7 +237,7 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
         "",
         "## Provisional recommendation",
         "",
-        "Use LightGBM as a **candidate lead ranking for a prospective audit pilot**, because its observed hit counts are at least as high as the other models at most displayed capacities. Keep Isolation Forest as a comparator because it found a different 2023 hit. Do not deploy a combined list or call LightGBM a proven winner: the paired differences are highly uncertain. Report K=100, 500, and 1,000 as alternative workload levels. Select a single operational K only after an audit team states its review capacity or audit cost/value rule; do not tune K on the 2022/2023 test outcomes.",
+        "Carry **both LightGBM and logistic regression** as candidates into a prospective audit pilot; the NPI-clustered percentage-cutoff comparisons do not establish a unique supervised-model winner. Keep Isolation Forest as an additional comparator because it found a different 2023 hit at K=500. Do not deploy a combined list or claim a proven operational winner from these retrospective results. Report K=100, 500, and 1,000 as alternative narrow-list workloads; separately report P1's 1% and 5% capacities. Select a single operational capacity only after an audit team states its review capacity or audit cost/value rule; do not tune capacity on the 2022/2023 test outcomes.",
         "",
         "A prospective pilot should record audited providers, confirmed findings, audit cost, and recoveries. Those observations are needed to estimate actual business value. Historical Medicare payments are not a savings estimate.",
         "",
@@ -212,6 +249,7 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
         "- [P4 PowerPoint section](../presentation_figures/FraudLens_P4_Evaluation.pptx)",
         "- [Interactive dashboard](p4_dashboard.html)",
         "- [Consolidated results](p4_results.csv), [top-K shortlists](p4_top_k_shortlists.csv), [model comparison](p4_model_comparison.csv)",
+        "- [P1 percentage-cutoff reconciliation](p4_p1_percentage_reconciliation.csv), [P1 peer baselines at fixed K](p4_p1_peer_baseline_topk.csv), [NPI bootstrap intervals](p4_p1_percentage_bootstrap.csv), [paired bootstrap differences](p4_p1_percentage_paired_bootstrap.csv)",
         "- [Per-year paired uncertainty](p4_model_paired_uncertainty.csv), [NPI-clustered pooled check](p4_pooled_npi_uncertainty.csv), [random benchmark](p4_seeded_random_baseline.csv), [coverage](p4_scoring_coverage_summary.csv)",
         "",
         "## Team confirmation before publication",
@@ -226,8 +264,8 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
 
 
 def dashboard(results: pd.DataFrame, coverage: pd.DataFrame) -> None:
-    model_rows = results.loc[results["approach"].isin(MODELS)].copy()
-    data = model_rows[["year", "approach", "K", "hits_at_k", "precision_at_k", "recall_at_k", "lift_at_k"]].to_dict(orient="records")
+    shown_rows = results.loc[results["approach"].isin(MODELS + BASELINES)].copy()
+    data = shown_rows[["year", "approach", "K", "hits_at_k", "precision_at_k", "recall_at_k", "lift_at_k"]].to_dict(orient="records")
     covered = coverage[["year", "individual_eval_pool", "score_coverage_within_eval_pool", "upstream_candidates_outside_eval_pool", "upstream_positive_records_outside_eval_pool"]].to_dict(orient="records")
     page = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -237,15 +275,15 @@ def dashboard(results: pd.DataFrame, coverage: pd.DataFrame) -> None:
 <p>Held-out 2022 and 2023 results. A hit means a provider later appeared in the two-year Scenario A exclusion label. It is not confirmed fraud or money saved. Isolation Forest ranks unusual decision-year billing without using exclusion labels.</p>
 <div class="note"><strong>P4 evaluation complete:</strong> P1, P2 and P3 handoffs are confirmed. Model differences remain uncertain. With no fixed audit budget or cost, all three K values are shown.</div>
 <div class="controls"><label>Year <select id="year"><option>2022</option><option>2023</option></select></label><label>Top K <select id="k"><option>100</option><option selected>500</option><option>1000</option></select></label></div>
-<div class="card"><h2>Model comparison</h2><table><thead><tr><th>Model</th><th>Hits</th><th>Precision</th><th>Recall</th><th>Lift</th></tr></thead><tbody id="rows"></tbody></table><p id="coverage"></p></div>
+<div class="card"><h2>Model and baseline comparison</h2><table><thead><tr><th>Method</th><th>Hits</th><th>Precision</th><th>Recall</th><th>Lift</th></tr></thead><tbody id="rows"></tbody></table><p id="coverage"></p></div>
 <div class="grid"><div class="card"><h2>Hits by workload</h2><img src="../presentation_figures/p4_hits_by_k.png" alt="Hits by K and year"></div><div class="card"><h2>Precision by workload</h2><img src="../presentation_figures/p4_precision_by_k.png" alt="Precision by K and year"></div></div>
 <div class="card"><h2>Evaluation pool</h2><img src="../presentation_figures/p4_scoring_coverage.png" alt="Share of upstream providers and positive records in the individual evaluation pool"></div>
-<p>Both payment rules found zero hits at the displayed capacities. Random selection almost always found zero. The full analysis and limitations are in <a href="p4_evaluation_summary.md">the evaluation summary</a>.</p>
+<p>The two raw-payment rules found zero hits at the displayed capacities; P1's peer-adjusted services baseline found one 2022 hit. Random selection almost always found zero. The larger 1% and 5% lists, including AUC and bootstrap intervals, are in <a href="p4_evaluation_summary.md">the evaluation summary</a>.</p>
 </main><script>
 const data=__DATA__; const coverage=__COVERAGE__;
-const names={supervised_lgbm:'LightGBM',supervised_logreg:'Logistic regression',anomaly_iforest:'Isolation Forest'};
+const names={supervised_lgbm:'LightGBM',supervised_logreg:'Logistic regression',anomaly_iforest:'Isolation Forest',highest_total_payment:'Highest total payment',highest_payment_per_beneficiary:'Highest payment per beneficiary',p1_baseline_pymt_per_bene_peer_z:'P1 peer payment/beneficiary',p1_baseline_srvcs_per_bene_peer_z:'P1 peer services/beneficiary'};
 function render(){const year=Number(document.getElementById('year').value),k=Number(document.getElementById('k').value);
- const selected=data.filter(r=>r.year===year&&r.K===k); const order=['supervised_lgbm','supervised_logreg','anomaly_iforest'];
+ const selected=data.filter(r=>r.year===year&&r.K===k); const order=['supervised_lgbm','supervised_logreg','anomaly_iforest','highest_total_payment','highest_payment_per_beneficiary','p1_baseline_pymt_per_bene_peer_z','p1_baseline_srvcs_per_bene_peer_z'];
  document.getElementById('rows').innerHTML=order.map(a=>{const r=selected.find(x=>x.approach===a);return `<tr><td>${names[a]}</td><td>${r.hits_at_k}</td><td>${(100*r.precision_at_k).toFixed(2)}%</td><td>${(100*r.recall_at_k).toFixed(2)}%</td><td>${r.lift_at_k.toFixed(1)}×</td></tr>`}).join('');
  const c=coverage.find(x=>x.year===year);document.getElementById('coverage').textContent=`The individual evaluation pool has ${c.individual_eval_pool.toLocaleString()} providers; all have three model scores. Another ${c.upstream_candidates_outside_eval_pool.toLocaleString()} upstream eligible candidates are unscored and outside this test denominator, including ${c.upstream_positive_records_outside_eval_pool} positive records.`}
 document.getElementById('year').addEventListener('change',render);document.getElementById('k').addEventListener('change',render);render();
