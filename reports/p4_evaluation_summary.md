@@ -1,6 +1,6 @@
 # FraudLens P4 evaluation summary
 
-**Status: provisional pending P2 feature-file confirmation.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. The team supplied no fixed audit budget or cost, so P4 reports audit yield at all three K values without selecting one.
+**Status: P4 evaluation complete; P1, P2 and P3 handoffs confirmed.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P2 confirmed the individual-practitioner feature file and both payment baseline fields. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. The team supplied no fixed audit budget or cost, so P4 reports audit yield at all three K values without selecting one.
 
 ## Decision evaluated
 
@@ -46,7 +46,7 @@ The payment baselines found zero hits at every displayed capacity. The seeded ra
 | 2022 | 1,230,281 | 1,165,640 (94.7%) | 64,641 | 82 | 4 |
 | 2023 | 1,259,333 | 1,196,525 (95.0%) | 62,808 | 58 | 3 |
 
-The broader candidate pool includes organisations and is **not** the test denominator. The 4 and 3 positive records outside the individual evaluation pool were not scored because they had no P2 feature row; their entity type is not established here. Within the evaluation pool, score coverage is 100%. Shortlist Medicare payment totals describe historical billing exposure only; no audit cost, adjudicated fraud, recoverable payment, or savings measure is available.
+The broader candidate pool includes organisations and is **not** the test denominator. P2 says candidates without features are mainly organisations. The 4 and 3 positive records outside the individual evaluation pool were not scored because they had no P2 feature row; their specific entity types cannot be verified because the local candidate file has no entity-type column. Within the evaluation pool, score coverage is 100%. Shortlist Medicare payment totals describe historical billing exposure only; no audit cost, adjudicated fraud, recoverable payment, or savings measure is available.
 
 ## Provisional recommendation
 
@@ -67,6 +67,6 @@ A prospective pilot should record audited providers, confirmed findings, audit c
 ## Team confirmation before publication
 
 1. P1's outcome and evaluation-population definitions are confirmed in the team reply. Obtain the actual generated `eval_pool.parquet` if a direct file-to-file key comparison is required; the published construction has already been reconciled exactly.
-2. P2: confirm the final feature file and individual-practitioner filter.
+2. P2 confirmed the final individual-practitioner feature file, `medicare_payment` for total-payment volume and `pymt_per_bene` for payment-per-beneficiary intensity.
 3. P3's score direction, 2020-only selection and mature training-year split are confirmed. If predictions change, revalidate that handoff before rerunning P4.
 4. The team requested audit-yield reporting without a fixed budget or cost. P4 has completed that comparison; a future operational sponsor would need to state capacity or costs before selecting one K.

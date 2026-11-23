@@ -4,7 +4,7 @@
 
 - Held-out 2022 and 2023 evaluation of LightGBM, logistic regression and Isolation Forest at K = 100, 500 and 1,000.
 - Payment and seeded-random baselines, top-K metrics, uncertainty, shortlist overlap, specialty summaries and evaluation-pool coverage within upstream candidates.
-- `reports/p4_evaluation_summary.md`: provisional conclusions and limitations.
+- `reports/p4_evaluation_summary.md`: final P4 analysis and limitations.
 - `reports/p4_dashboard.html`: local interactive view of year and K results.
 - `reports/p4_results.csv`, `reports/p4_top_k_shortlists.csv` and `reports/p4_model_comparison.csv`: consolidated deliverables.
 - `presentation_figures/FraudLens_P4_Evaluation.pptx`: six-slide **P4 section** for the team deck. Two results charts are editable PowerPoint charts.
@@ -57,12 +57,12 @@ The 2020 capacity exploration is a separate validation-only check in `src/p4_com
 
 **P1 confirmed:** Scenario A (`y_A_h2`) is primary, both 2022 and 2023 two-year windows are complete and uncensored, and the final evaluation denominator is `eval_pool.parquet` (individual practitioners with features). Counts are 82 and 58 positive provider-year records, 113 distinct positive NPIs across both years. The actual generated Parquet file would enable a direct comparison; P4 has already recreated P1's published formula and verified exact keys against its cohorts.
 
-**P2:** Confirm that the final feature file retains individual practitioners as the feature-building code specifies. P4 reports broader upstream candidates separately. All individuals in the evaluation pool have all three model scores.
+**P2 confirmed:** The final feature file covers individual practitioners as the feature-building code specifies. P2 also confirmed `medicare_payment` as the total-payment volume baseline and `pymt_per_bene` as the payment-per-beneficiary intensity baseline. P4 reports broader upstream candidates separately. All individuals in the evaluation pool have all three model scores.
 
 **P3 confirmed:** The comparison uses the same eligible, feature-covered pool for all three models and payment baselines. Higher score means higher audit priority for every approach. LightGBM and logistic regression scores are predicted exclusion probabilities; Isolation Forest's score is sign-reversed so more unusual billing ranks higher. P3 selected supervised settings using 2020 validation only; Isolation Forest settings were fixed. The supervised 2022 models used matured 2013–2020 labels, and the supervised 2023 models used matured 2013–2021 labels. Isolation Forest uses decision-year billing features but no labels. P3 confirmed the supplied predictions are the final handoff. P4 breaks tied scores by NPI ascending and reports tie sensitivity.
 
-The 64,641 (2022) and 62,808 (2023) upstream eligible rows without features/scores are reported separately, with 4 and 3 positive records. Under P1's definition they are outside the individual evaluation denominator, so they do not enter primary Recall@K.
+The 64,641 (2022) and 62,808 (2023) upstream eligible rows without features/scores are reported separately, with 4 and 3 positive records. P2 says these missing rows are mainly organisations. The local candidate file has no entity-type column, so P4 cannot verify the type of every missing row. Under P1's definition they are outside the individual evaluation denominator, so they do not enter primary Recall@K.
 
 **Audit capacity:** The team supplied no fixed budget or cost and requested audit-yield metrics. P4 therefore reports K = 100, 500 and 1,000 without selecting a single operational K. If an audit sponsor later needs one shortlist size, it must provide review capacity or an audit cost/value rule. No observed audit costs, confirmed findings or recoveries are available, so the project cannot claim monetary savings.
 
-Until P2 confirms the final feature file, the evaluation report and deck remain **provisional**. The historical test hit counts are descriptive; paired uncertainty does not establish a reliable winner.
+P1, P2 and P3 have confirmed their respective handoffs, and the **P4 evaluation deliverables are complete**. The historical test hit counts are descriptive; paired uncertainty does not establish a reliable winner. The actual generated P1 `eval_pool.parquet` remains optional for a direct file comparison; its published construction and cohort keys already reconcile.

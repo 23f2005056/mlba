@@ -1,15 +1,17 @@
 # FraudLens P4 evaluation protocol
 
-Status: **provisional pending P2 confirmation**. P1 confirmed the primary
+Status: **P4 handoff confirmed**. P1 confirmed the primary
 outcome, uncensored test windows, and individual-practitioner evaluation pool.
 P3 confirmed the prediction handoff, higher-is-higher priority score direction,
-and validation-only model selection on 2020.
+and validation-only model selection on 2020. P2 confirmed that the final feature
+file covers individual practitioners and that the two payment fields are the
+intended baselines.
 This document records the rules
 used for the held-out P4 test results in `reports/p4_evaluation_summary.md`.
 The outcome, test years, and score direction
 follow the real files and P3's prediction handoff. No single primary audit
 capacity has been established, so P4 reports all three K values without
-selecting one. P2's final feature handoff remains to be confirmed. All rows in
+selecting one. All rows in
 the individual evaluation pool have all three model scores.
 
 ## Decision and outcome
@@ -66,15 +68,18 @@ generator against these paths.
    candidate pool, which includes organisations. It is not the test-metric
    denominator. In 2022 and 2023, 64,641 and 62,808 upstream eligible rows
    lack P2 features/model scores and are outside the evaluation pool. These
-   include 4 and 3 positive records; their exact entity types have not been
-   established. Within the evaluation pool, all three scores cover 100%.
+   include 4 and 3 positive records. P2 says the missing rows are mainly
+   organisations; the local candidate file has no entity-type column, so their
+   individual entity types have not been independently verified. Within the
+   evaluation pool, all three scores cover 100%.
 3. Do not assign a made-up score to upstream candidates outside the evaluation
    pool. Report any upstream sensitivity separately from primary test recall.
 
 ## Ranking and metrics
 
-- Payment baselines: descending `medicare_payment` and descending
-  `pymt_per_bene` from P2's feature table. Use ascending `npi` as a
+- Payment baselines: descending `medicare_payment` (total-payment volume) and
+  descending `pymt_per_bene` (payment per beneficiary) from P2's feature
+  table, as confirmed by P2. Use ascending `npi` as a
   deterministic tie-breaker for **every** ranking, including model scores.
   This fixed NPI order is P4's tie rule; it does not depend on outcomes.
 - Random baseline: generate reproducible seeded random shortlists on the same
@@ -125,20 +130,22 @@ could yield 3 to 6 hits at either cutoff. Show this tie sensitivity when
 interpreting the validation comparison. Do not label any K operationally
 optimal without a capacity or cost/value decision rule.
 
-## Remaining decisions and handoff checks
+## Handoff and operational decisions
 
 1. **Audit capacity `K`:** the team supplied no fixed budget or cost and asked
    for audit-yield comparisons. P4 evaluates `100`, `500`, and `1000` equally
    for all approaches and leaves operational K unselected. This is the agreed
    reporting approach, not an unresolved P4 computation.
-2. **P2 handoff:** confirm that the final feature file follows the
-   individual-practitioner filter in the feature-building code.
+2. **P2 handoff:** P2 confirmed that the final feature file covers individual
+   practitioners and that `medicare_payment` and `pymt_per_bene` are the final
+   volume and intensity baseline fields.
 3. **P1 file:** if available, provide the generated `eval_pool.parquet` for a
    direct file comparison; its published formula and counts already reconcile.
 4. **Predictions:** P3's score direction, validation-only selection and mature
    training-year split are confirmed in the team handoff. Keep that contract
    fixed if predictions are regenerated.
 
-Do not label this protocol final or treat the provisional audit recommendation
-as an operational decision until these items are resolved. Changes to the
-outcome horizon require matching predictions from P3.
+The P4 evaluation is complete. The P1 file comparison is optional because its
+published key rule and counts already reconcile. The pilot recommendation is
+not an operational model or budget decision. Changes to the outcome horizon
+require matching predictions from P3.
