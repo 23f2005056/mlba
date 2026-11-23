@@ -152,13 +152,19 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
     lines = [
         "# FraudLens P4 evaluation summary",
         "",
-        "**Status: provisional.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P2 and P3 handoff confirmations remain before final publication.",
+        "**Status: provisional.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. P2's final feature handoff and an operational audit capacity remain to be confirmed.",
         "",
         "## Decision evaluated",
         "",
         "At the end of a reporting year, rank eligible providers for audit. A hit is a provider with a later Scenario A LEIE exclusion within the two-year label window (`y_A_h2`). This is a proxy for audit prioritisation, not proven billing fraud or a measured recovery.",
         "",
         "Every model and baseline uses the same P1 evaluation pool within each year: eligible individuals with P2 features. P1's `eval_pool.parquet` was not supplied locally, so P4 reconstructed its published rule from labels and feature keys; the reconstructed keys exactly match P4's test cohorts. All providers in this pool have all three scores. K = 100, 500, and 1,000 are audit-capacity scenarios, not an operationally selected capacity. The 2020 data was used for validation, not for this held-out table.",
+        "",
+        "## Model scores and tie rule",
+        "",
+        "LightGBM and logistic regression scores are predicted probabilities of later exclusion. Isolation Forest is fitted separately to each decision year's billing features, which P3 says are available at the decision date, without exclusion labels. Its anomaly score was negated so more unusual billing ranks higher; that score is not a probability. P3 chose supervised settings on 2020 validation only, kept Isolation Forest settings fixed, and used matured labels from 2013–2020 for the supervised 2022 models and 2013–2021 for the supervised 2023 models. P3 confirms neither test year was used to choose model settings.",
+        "",
+        "Every ranking sorts by score descending, then NPI ascending when scores tie. This fixed tie rule uses no outcome information. P3 reports that final LightGBM has 13 trees, so tied scores can occur. P4 checked the minimum and maximum possible hit counts across cutoff tie orders; all held-out 2022/2023 cutoffs have the same hit count under every tie order. The large 2020 validation ties remain a separate sensitivity issue and did not determine K.",
         "",
         "## Held-out results",
         "",
@@ -179,15 +185,15 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
         "- In 2023, Isolation Forest found 1 hit at K=500 while the supervised models found 0. At K=1,000, LightGBM and Isolation Forest each found 1, but they were different providers.",
         "- All 18 paired 95% bootstrap intervals for model hit differences include zero. The smallest exact paired p-value is 0.25. These fixed-shortlist checks do not establish a reliable winner or account for model retraining and future-year drift.",
         "- Across both test years there are 140 positive provider-year records but only 113 distinct positive NPIs. A supplementary pooled comparison resamples whole NPIs and also finds no reliable model difference; the primary metrics remain separate by year.",
-        "- At the cutoffs used for the three models in 2022 and 2023, deterministic tie handling did not change the observed hit counts.",
+        "- At the cutoffs used for the three models in 2022 and 2023, alternative ordering within tied scores would not change the observed hit counts.",
         "",
         "## Evaluation pool and upstream coverage",
         "",
-        "| Year | Upstream eligible candidates | Individual evaluation pool | Positive records in evaluation pool | Positive records outside evaluation pool |",
-        "|---|---:|---:|---:|---:|",
+        "| Year | Upstream eligible candidates | Individual evaluation pool (all scored) | Upstream candidates outside pool (unscored) | Positive records in evaluation pool | Positive records outside evaluation pool |",
+        "|---|---:|---:|---:|---:|---:|",
     ]
     for row in coverage.itertuples(index=False):
-        lines.append(f"| {row.year} | {row.upstream_eligible_candidates:,} | {row.individual_eval_pool:,} ({row.eval_pool_share_of_upstream_candidates:.1%}) | {row.eval_pool_later_exclusion_records} | {row.upstream_positive_records_outside_eval_pool} |")
+        lines.append(f"| {row.year} | {row.upstream_eligible_candidates:,} | {row.individual_eval_pool:,} ({row.eval_pool_share_of_upstream_candidates:.1%}) | {row.upstream_candidates_outside_eval_pool:,} | {row.eval_pool_later_exclusion_records} | {row.upstream_positive_records_outside_eval_pool} |")
     lines += [
         "",
         "The broader candidate pool includes organisations and is **not** the test denominator. The 4 and 3 positive records outside the individual evaluation pool were not scored because they had no P2 feature row; their entity type is not established here. Within the evaluation pool, score coverage is 100%. Shortlist Medicare payment totals describe historical billing exposure only; no audit cost, adjudicated fraud, recoverable payment, or savings measure is available.",
@@ -212,7 +218,7 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
         "",
         "1. P1's outcome and evaluation-population definitions are confirmed in the team reply. Obtain the actual generated `eval_pool.parquet` if a direct file-to-file key comparison is required; the published construction has already been reconciled exactly.",
         "2. P2: confirm the final feature file and individual-practitioner filter.",
-        "3. P3: confirm score direction and that 2022/2023 outcomes were not used to choose model settings.",
+        "3. P3's score direction, 2020-only selection and mature training-year split are confirmed. If predictions change, revalidate that handoff before rerunning P4.",
         "4. Audit sponsor: state review capacity or costs so a single K and financial decision rule can be chosen.",
         "",
     ]
@@ -222,13 +228,13 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
 def dashboard(results: pd.DataFrame, coverage: pd.DataFrame) -> None:
     model_rows = results.loc[results["approach"].isin(MODELS)].copy()
     data = model_rows[["year", "approach", "K", "hits_at_k", "precision_at_k", "recall_at_k", "lift_at_k"]].to_dict(orient="records")
-    covered = coverage[["year", "individual_eval_pool", "score_coverage_within_eval_pool", "upstream_positive_records_outside_eval_pool"]].to_dict(orient="records")
+    covered = coverage[["year", "individual_eval_pool", "score_coverage_within_eval_pool", "upstream_candidates_outside_eval_pool", "upstream_positive_records_outside_eval_pool"]].to_dict(orient="records")
     page = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FraudLens P4 evaluation</title>
 <style>body{font:16px/1.5 system-ui,Arial,sans-serif;color:#183047;background:#f4f7fa;margin:0}main{max-width:1100px;margin:auto;padding:28px}h1{margin-bottom:5px}p{max-width:850px}.note{background:#fff4d6;border-left:4px solid #db9b20;padding:12px 16px}.controls{display:flex;gap:16px;margin:24px 0}label{font-weight:600}select{font:inherit;padding:7px;margin-left:8px}table{border-collapse:collapse;width:100%;background:white}th,td{padding:11px;border-bottom:1px solid #dce3eb;text-align:left}th{background:#dceafa}.card{background:white;padding:18px;border-radius:9px;box-shadow:0 1px 4px #ced8e2;margin:18px 0}img{max-width:100%;height:auto}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}@media(max-width:760px){.grid{grid-template-columns:1fr}}</style>
 </head><body><main><h1>FraudLens audit-priority evaluation</h1>
-<p>Held-out 2022 and 2023 results. A hit means a provider later appeared in the two-year Scenario A exclusion label. It is not confirmed fraud or money saved.</p>
+<p>Held-out 2022 and 2023 results. A hit means a provider later appeared in the two-year Scenario A exclusion label. It is not confirmed fraud or money saved. Isolation Forest ranks unusual decision-year billing without using exclusion labels.</p>
 <div class="note"><strong>Provisional:</strong> Model differences are uncertain. K is an audit workload scenario; no audit capacity or financial value rule has been supplied.</div>
 <div class="controls"><label>Year <select id="year"><option>2022</option><option>2023</option></select></label><label>Top K <select id="k"><option>100</option><option selected>500</option><option>1000</option></select></label></div>
 <div class="card"><h2>Model comparison</h2><table><thead><tr><th>Model</th><th>Hits</th><th>Precision</th><th>Recall</th><th>Lift</th></tr></thead><tbody id="rows"></tbody></table><p id="coverage"></p></div>
@@ -241,7 +247,7 @@ const names={supervised_lgbm:'LightGBM',supervised_logreg:'Logistic regression',
 function render(){const year=Number(document.getElementById('year').value),k=Number(document.getElementById('k').value);
  const selected=data.filter(r=>r.year===year&&r.K===k); const order=['supervised_lgbm','supervised_logreg','anomaly_iforest'];
  document.getElementById('rows').innerHTML=order.map(a=>{const r=selected.find(x=>x.approach===a);return `<tr><td>${names[a]}</td><td>${r.hits_at_k}</td><td>${(100*r.precision_at_k).toFixed(2)}%</td><td>${(100*r.recall_at_k).toFixed(2)}%</td><td>${r.lift_at_k.toFixed(1)}×</td></tr>`}).join('');
- const c=coverage.find(x=>x.year===year);document.getElementById('coverage').textContent=`The individual evaluation pool has ${c.individual_eval_pool.toLocaleString()} providers; all have three model scores. ${c.upstream_positive_records_outside_eval_pool} positive records are outside this pool and are not part of the test denominator.`}
+ const c=coverage.find(x=>x.year===year);document.getElementById('coverage').textContent=`The individual evaluation pool has ${c.individual_eval_pool.toLocaleString()} providers; all have three model scores. Another ${c.upstream_candidates_outside_eval_pool.toLocaleString()} upstream eligible candidates are unscored and outside this test denominator, including ${c.upstream_positive_records_outside_eval_pool} positive records.`}
 document.getElementById('year').addEventListener('change',render);document.getElementById('k').addEventListener('change',render);render();
 </script></body></html>"""
     page = page.replace("__DATA__", json.dumps(data)).replace("__COVERAGE__", json.dumps(covered))

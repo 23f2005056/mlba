@@ -1,12 +1,15 @@
 # FraudLens P4 evaluation protocol
 
-Status: **provisional pending P2/P3 confirmation**. P1 has confirmed the primary
+Status: **provisional pending P2 confirmation and audit capacity**. P1 confirmed the primary
 outcome, uncensored test windows, and individual-practitioner evaluation pool.
+P3 confirmed the prediction handoff, higher-is-higher priority score direction,
+and validation-only model selection on 2020.
 This document records the rules
 used for the held-out P4 test results in `reports/p4_evaluation_summary.md`.
 The outcome, test years, and score direction
 follow the real files and P3's prediction handoff. No single primary audit
-capacity has been established; P2/P3 handoff confirmations remain. All rows in
+capacity has been established; P2's final feature handoff remains to be
+confirmed. All rows in
 the individual evaluation pool have all three model scores.
 
 ## Decision and outcome
@@ -19,8 +22,16 @@ the individual evaluation pool have all three model scores.
 - Primary held-out test years: **2022 and 2023**, reported separately. The 2020
   predictions are validation data and are not a held-out test result.
 - P3's three approaches are `supervised_lgbm`, `supervised_logreg`, and
-  `anomaly_iforest`. Rank each approach by descending `score`; the anomaly
-  score is not interpreted as an exclusion probability.
+  `anomaly_iforest`. Rank each approach by descending `score`. The two
+  supervised scores are predicted exclusion probabilities. P3 negated the
+  Isolation Forest anomaly score, so more unusual billing ranks higher; it is
+  not an exclusion probability. Isolation Forest is fitted on each decision
+  year's billing features, which P3 says are available at that decision date,
+  without labels or tuning on test outcomes.
+- P3 confirmed that LightGBM tree count and logistic-regression C were selected
+  on 2020 only; Isolation Forest settings were fixed. The supervised models
+  for 2022 used only matured 2013–2020 labels, and the supervised models for
+  2023 used matured 2013–2021 labels.
 - The evaluation concerns later LEIE exclusions and audit prioritisation; it
   does not identify proven billing fraud.
 
@@ -53,9 +64,10 @@ generator against these paths.
    P1-generated Parquet file has not yet been supplied for direct comparison.
 2. **Upstream coverage report:** separately describe P1's broader eligible
    candidate pool, which includes organisations. It is not the test-metric
-   denominator. The 4 and 3 positive records outside the individual
-   evaluation pool have no P2 feature row; their exact entity types have not
-   been established. Within the evaluation pool, all three scores cover 100%.
+   denominator. In 2022 and 2023, 64,641 and 62,808 upstream eligible rows
+   lack P2 features/model scores and are outside the evaluation pool. These
+   include 4 and 3 positive records; their exact entity types have not been
+   established. Within the evaluation pool, all three scores cover 100%.
 3. Do not assign a made-up score to upstream candidates outside the evaluation
    pool. Report any upstream sensitivity separately from primary test recall.
 
@@ -63,7 +75,8 @@ generator against these paths.
 
 - Payment baselines: descending `medicare_payment` and descending
   `pymt_per_bene` from P2's feature table. Use ascending `npi` as a
-  deterministic tie-breaker for every ranking.
+  deterministic tie-breaker for **every** ranking, including model scores.
+  This fixed NPI order is P4's tie rule; it does not depend on outcomes.
 - Random baseline: generate reproducible seeded random shortlists on the same
   population and report their average and spread. Check the average against
   the analytical expectation (`expected_hits = K * P / N`,
@@ -78,6 +91,11 @@ generator against these paths.
   test years for the primary result.
 - Compare rankings with paired bootstrap uncertainty and shortlist overlap
   after the basic top-K results pass input checks.
+- P3 reports the final LightGBM model has 13 trees. LightGBM has tied scores
+  at some held-out cutoffs (for example, 29 providers
+  at 2022 K=500 and 96 at 2023 K=1,000). P4 reports the tie sizes and the
+  minimum/maximum possible hits across within-tie orders. At the displayed
+  2022/2023 cutoffs, these hit bounds equal the observed counts.
 - Keep 2022 and 2023 primary metrics separate. The combined 140 positive
   provider-year records correspond to 113 distinct NPIs. Any supplementary
   two-year bootstrap resamples whole NPIs so repeated providers stay together.
@@ -107,7 +125,7 @@ could yield 3 to 6 hits at either cutoff. Show this tie sensitivity when
 interpreting the validation comparison. Do not label any K operationally
 optimal without a capacity or cost/value decision rule.
 
-## Awaiting team confirmation
+## Remaining decisions and handoff checks
 
 1. **Audit capacity `K`:** evaluate `100`, `500`, and `1000` equally for all
    approaches. A single operational capacity remains unselected because no
@@ -116,8 +134,9 @@ optimal without a capacity or cost/value decision rule.
    individual-practitioner filter in the feature-building code.
 3. **P1 file:** if available, provide the generated `eval_pool.parquet` for a
    direct file comparison; its published formula and counts already reconcile.
-4. **Predictions:** P3 should confirm that higher scores always mean higher
-   audit priority and that 2022 and 2023 were not used to choose settings.
+4. **Predictions:** P3's score direction, validation-only selection and mature
+   training-year split are confirmed in the team handoff. Keep that contract
+   fixed if predictions are regenerated.
 
 Do not label this protocol final or treat the provisional audit recommendation
 as an operational decision until these items are resolved. Changes to the

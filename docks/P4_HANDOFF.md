@@ -59,8 +59,10 @@ The 2020 capacity exploration is a separate validation-only check in `src/p4_com
 
 **P2:** Confirm that the final feature file retains individual practitioners as the feature-building code specifies. P4 reports broader upstream candidates separately. All individuals in the evaluation pool have all three model scores.
 
-**P3:** Confirm that higher score means higher audit priority for all three approaches and that 2022/2023 outcome information was not used to choose model settings. Confirm the supplied predictions remain the final handoff.
+**P3 confirmed:** The comparison uses the same eligible, feature-covered pool for all three models and payment baselines. Higher score means higher audit priority for every approach. LightGBM and logistic regression scores are predicted exclusion probabilities; Isolation Forest's score is sign-reversed so more unusual billing ranks higher. P3 selected supervised settings using 2020 validation only; Isolation Forest settings were fixed. The supervised 2022 models used matured 2013–2020 labels, and the supervised 2023 models used matured 2013–2021 labels. Isolation Forest uses decision-year billing features but no labels. P3 confirmed the supplied predictions are the final handoff. P4 breaks tied scores by NPI ascending and reports tie sensitivity.
+
+The 64,641 (2022) and 62,808 (2023) upstream eligible rows without features/scores are reported separately, with 4 and 3 positive records. Under P1's definition they are outside the individual evaluation denominator, so they do not enter primary Recall@K.
 
 **Audit sponsor or team:** State the number of audits possible, or an audit cost and value rule, before selecting one K. No observed audit costs, confirmed findings or recoveries are available, so the project cannot claim monetary savings.
 
-Until P2/P3 and audit-capacity confirmations arrive, the evaluation report and deck remain **provisional**. The historical test hit counts are descriptive; paired uncertainty does not establish a reliable winner.
+Until P2 and audit-capacity confirmations arrive, the evaluation report and deck remain **provisional**. The historical test hit counts are descriptive; paired uncertainty does not establish a reliable winner.
