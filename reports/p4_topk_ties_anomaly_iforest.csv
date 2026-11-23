@@ -1,0 +1,7 @@
+year,approach,K,cutoff_score,cutoff_tie_size,selected_from_cutoff_tie,tie_crosses_cutoff
+2022,anomaly_iforest,100,0.6959878399997822,1,1,False
+2022,anomaly_iforest,500,0.663477981723157,1,1,False
+2022,anomaly_iforest,1000,0.6424880673872488,1,1,False
+2023,anomaly_iforest,100,0.6985620754657765,1,1,False
+2023,anomaly_iforest,500,0.6667340912754927,1,1,False
+2023,anomaly_iforest,1000,0.6465957950267285,1,1,False

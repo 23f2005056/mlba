@@ -13,3 +13,7 @@
 .venv/
 __pycache__/
 *.pyc
+
+# Local P4 presentation build intermediates
+/.p4_build/
+/.chart-data-*/

@@ -1,0 +1,224 @@
+specialty,providers,later_exclusions,observed_medicare_payment_sum,year,K
+Nurse Practitioner,51,0,88286356.15625,2022,100
+Physician Assistant,13,0,21570233.546875,2022,100
+Hematology-Oncology,8,0,15439829.75,2022,100
+Internal Medicine,7,0,17309053.25,2022,100
+Emergency Medicine,4,0,55747362.625,2022,100
+General Practice,3,0,27073230.0,2022,100
+Family Practice,2,0,2357629.0,2022,100
+Neurology,2,0,2504100.75,2022,100
+Pain Management,2,0,45533950.4375,2022,100
+General Surgery,1,0,5878948.0,2022,100
+Hematology,1,0,737494.5625,2022,100
+Obstetrics & Gynecology,1,0,1524146.75,2022,100
+Ophthalmology,1,0,2743911.25,2022,100
+Podiatry,1,0,776380.5,2022,100
+Preventive Medicine,1,0,1277893.0,2022,100
+Radiation Oncology,1,0,762557.0,2022,100
+Rheumatology,1,0,1563930.25,2022,100
+Nurse Practitioner,191,0,233970957.32617188,2022,500
+Hematology-Oncology,66,0,117335358.21875,2022,500
+Internal Medicine,32,0,75410307.875,2022,500
+Physician Assistant,29,0,41096341.4296875,2022,500
+Diagnostic Radiology,25,0,5662878.1015625,2022,500
+Medical Oncology,16,0,12197945.875,2022,500
+Family Practice,14,0,15060925.59375,2022,500
+Radiation Oncology,13,0,15073647.9375,2022,500
+Ophthalmology,12,0,19009823.75,2022,500
+Rheumatology,12,0,14429898.65625,2022,500
+General Surgery,8,0,18623372.46875,2022,500
+Neurology,8,0,7487020.3125,2022,500
+Podiatry,8,0,21180570.0,2022,500
+Emergency Medicine,6,0,63947568.125,2022,500
+General Practice,5,0,28378401.5625,2022,500
+Interventional Radiology,5,0,7565323.5625,2022,500
+Pain Management,5,0,48799849.4375,2022,500
+Cardiology,3,0,2538518.7265625,2022,500
+Geriatric Medicine,3,0,20568809.4375,2022,500
+Obstetrics & Gynecology,3,0,4306443.28125,2022,500
+Pediatric Medicine,3,0,2688490.1796875,2022,500
+Vascular Surgery,3,0,7740305.0625,2022,500
+Allergy/ Immunology,2,0,3374917.875,2022,500
+Endocrinology,2,0,843247.21875,2022,500
+Gastroenterology,2,0,12238442.58984375,2022,500
+Hospitalist,2,0,732903.3125,2022,500
+Infectious Disease,2,0,4026603.125,2022,500
+Nuclear Medicine,2,0,4098603.625,2022,500
+Occupational Therapist in Private Practice,2,0,1454276.125,2022,500
+Pathology,2,0,2626351.1875,2022,500
+Plastic and Reconstructive Surgery,2,0,12855978.5,2022,500
+Anesthesiology,1,0,722793.8125,2022,500
+Cardiac Surgery,1,0,1750158.875,2022,500
+Critical Care (Intensivists),1,0,152940.875,2022,500
+Dermatology,1,0,709990.6875,2022,500
+Gynecological Oncology,1,0,354105.75,2022,500
+Hematology,1,0,737494.5625,2022,500
+Interventional Cardiology,1,0,1972152.5,2022,500
+Physical Medicine and Rehabilitation,1,0,167241.125,2022,500
+Preventive Medicine,1,0,1277893.0,2022,500
+Psychiatry,1,0,273934.0625,2022,500
+Pulmonary Disease,1,0,534867.9375,2022,500
+Undersea and Hyperbaric Medicine,1,0,6753411.0,2022,500
+Nurse Practitioner,336,0,384569042.3305054,2022,1000
+Hematology-Oncology,119,0,211725421.578125,2022,1000
+Diagnostic Radiology,70,0,25445578.02734375,2022,1000
+Internal Medicine,62,0,115775653.32421875,2022,1000
+Physician Assistant,60,0,53385455.08642578,2022,1000
+Family Practice,36,0,57907870.84375,2022,1000
+Rheumatology,31,0,39210752.734375,2022,1000
+Medical Oncology,28,0,26531477.34375,2022,1000
+Ophthalmology,27,0,43528301.78125,2022,1000
+Podiatry,25,0,87210349.6953125,2022,1000
+Radiation Oncology,24,0,29995461.8125,2022,1000
+Neurology,18,0,21544839.203125,2022,1000
+General Surgery,15,0,37407320.546875,2022,1000
+Interventional Radiology,12,0,20060387.8203125,2022,1000
+Emergency Medicine,9,0,65684535.015625,2022,1000
+Infectious Disease,9,0,28409104.40625,2022,1000
+Pain Management,8,0,50585376.09375,2022,1000
+Physical Therapist in Private Practice,8,0,1821532.2734375,2022,1000
+Vascular Surgery,8,0,16162900.0,2022,1000
+General Practice,7,0,32870418.84375,2022,1000
+Plastic and Reconstructive Surgery,7,0,31473319.09375,2022,1000
+Anesthesiology,6,0,3836248.296875,2022,1000
+Gastroenterology,5,0,12846707.927658081,2022,1000
+Hematology,5,0,19504774.5625,2022,1000
+Obstetrics & Gynecology,5,0,4992314.5625,2022,1000
+Cardiology,4,0,3080313.9765625,2022,1000
+Dermatology,4,0,15567479.4375,2022,1000
+Hospitalist,4,0,4213161.8125,2022,1000
+Physical Medicine and Rehabilitation,4,0,2424178.40625,2022,1000
+Allergy/ Immunology,3,0,5983807.125,2022,1000
+Chiropractic,3,0,159.27999877929688,2022,1000
+Geriatric Medicine,3,0,20568809.4375,2022,1000
+Gynecological Oncology,3,0,4060651.40625,2022,1000
+Interventional Pain Management,3,0,1087786.4850006104,2022,1000
+Pathology,3,0,3463691.1875,2022,1000
+Pediatric Medicine,3,0,2688490.1796875,2022,1000
+Endocrinology,2,0,843247.21875,2022,1000
+Nephrology,2,0,4037858.875,2022,1000
+Nuclear Medicine,2,0,4098603.625,2022,1000
+Occupational Therapist in Private Practice,2,0,1454276.125,2022,1000
+Otolaryngology,2,0,628156.09375,2022,1000
+Psychiatry,2,0,545587.3125,2022,1000
+Pulmonary Disease,2,0,8481997.4375,2022,1000
+Cardiac Surgery,1,0,1750158.875,2022,1000
+Certified Clinical Nurse Specialist,1,0,1319559.625,2022,1000
+Critical Care (Intensivists),1,0,152940.875,2022,1000
+Interventional Cardiology,1,0,1972152.5,2022,1000
+Neuropsychiatry,1,0,84394.34375,2022,1000
+Oral Surgery (Dentist only),1,0,2967248.25,2022,1000
+Preventive Medicine,1,0,1277893.0,2022,1000
+Thoracic Surgery,1,0,293188.09375,2022,1000
+Undersea and Hyperbaric Medicine,1,0,6753411.0,2022,1000
+Nurse Practitioner,57,0,511068410.5625,2023,100
+Internal Medicine,16,0,115431948.1875,2023,100
+Physician Assistant,7,0,40111859.875,2023,100
+Podiatry,4,0,128600800.0,2023,100
+Emergency Medicine,3,0,7526196.625,2023,100
+Family Practice,2,0,25698810.0,2023,100
+Allergy/ Immunology,1,0,774502.8125,2023,100
+Anesthesiology,1,0,6358932.5,2023,100
+Diagnostic Radiology,1,0,3924132.5,2023,100
+General Surgery,1,0,1233931.125,2023,100
+Hematology,1,0,1313122.625,2023,100
+Hematopoietic Cell Transplantation and Cellular Therapy,1,0,3361899.5,2023,100
+Hospitalist,1,0,1903373.5,2023,100
+Neurology,1,0,2103510.5,2023,100
+Osteopathic Manipulative Medicine,1,0,5566721.0,2023,100
+Physical Therapist in Private Practice,1,0,14479587.0,2023,100
+Undersea and Hyperbaric Medicine,1,0,5259010.5,2023,100
+Nurse Practitioner,232,0,826162364.5507812,2023,500
+Internal Medicine,47,0,234370407.65625,2023,500
+Hematology-Oncology,29,0,80789747.8125,2023,500
+Physician Assistant,28,0,83214882.078125,2023,500
+Family Practice,19,0,140463672.8125,2023,500
+Medical Oncology,18,0,30846077.5625,2023,500
+Podiatry,16,0,192305594.75,2023,500
+Emergency Medicine,11,1,15749670.71875,2023,500
+Diagnostic Radiology,10,0,23768826.3125,2023,500
+Ophthalmology,10,0,40542138.25,2023,500
+Hematology,8,0,12834365.875,2023,500
+General Surgery,6,0,26023992.59375,2023,500
+Rheumatology,6,0,8394752.09375,2023,500
+General Practice,5,0,48274542.375,2023,500
+Gynecological Oncology,5,0,5659286.84375,2023,500
+Gastroenterology,4,0,25120163.9375,2023,500
+Neurology,4,0,6503279.5,2023,500
+Vascular Surgery,4,0,14261648.25,2023,500
+Anesthesiology,3,0,8853198.0625,2023,500
+Dermatology,3,0,26509316.875,2023,500
+Infectious Disease,3,0,4055221.9375,2023,500
+Nuclear Medicine,3,0,10884195.0,2023,500
+Pain Management,3,0,7164411.875,2023,500
+Plastic and Reconstructive Surgery,3,0,15558056.75,2023,500
+Interventional Pain Management,2,0,4765418.0,2023,500
+Pathology,2,0,18953004.0,2023,500
+Physical Therapist in Private Practice,2,0,16929173.5,2023,500
+Allergy/ Immunology,1,0,774502.8125,2023,500
+Cardiology,1,0,2415828.75,2023,500
+Critical Care (Intensivists),1,0,145909.234375,2023,500
+Hematopoietic Cell Transplantation and Cellular Therapy,1,0,3361899.5,2023,500
+Hospice and Palliative Care,1,0,584172.9375,2023,500
+Hospitalist,1,0,1903373.5,2023,500
+Interventional Radiology,1,0,3595421.0,2023,500
+Obstetrics & Gynecology,1,0,365201.1875,2023,500
+Orthopedic Surgery,1,0,3233221.25,2023,500
+Osteopathic Manipulative Medicine,1,0,5566721.0,2023,500
+Pediatric Medicine,1,0,4610540.0,2023,500
+Psychiatry,1,0,2144352.5,2023,500
+Radiation Oncology,1,0,4728780.0,2023,500
+Undersea and Hyperbaric Medicine,1,0,5259010.5,2023,500
+Nurse Practitioner,423,0,1182203597.0717964,2023,1000
+Internal Medicine,81,0,308988872.828125,2023,1000
+Hematology-Oncology,71,0,151602389.71875,2023,1000
+Physician Assistant,63,0,124219526.33203125,2023,1000
+Family Practice,34,0,195797747.4375,2023,1000
+Podiatry,32,0,243282447.171875,2023,1000
+Medical Oncology,30,0,48205647.03125,2023,1000
+Diagnostic Radiology,26,0,35056125.2734375,2023,1000
+Ophthalmology,26,0,77882821.0,2023,1000
+Rheumatology,20,0,22396821.21875,2023,1000
+Emergency Medicine,18,1,31571549.578125,2023,1000
+General Surgery,16,0,56373384.71875,2023,1000
+Hematology,16,0,40698158.875,2023,1000
+Neurology,13,0,31072575.1953125,2023,1000
+General Practice,12,0,80448407.59375,2023,1000
+Infectious Disease,8,0,35942117.1875,2023,1000
+Plastic and Reconstructive Surgery,8,0,57833495.875,2023,1000
+Dermatology,7,0,60818024.375,2023,1000
+Gynecological Oncology,7,0,6083535.203125,2023,1000
+Pathology,7,0,27668874.5,2023,1000
+Radiation Oncology,7,0,12850556.1875,2023,1000
+Gastroenterology,6,0,25756501.140625,2023,1000
+Vascular Surgery,6,0,24389198.9375,2023,1000
+Anesthesiology,5,0,13483356.359375,2023,1000
+Hospitalist,5,0,6465175.0,2023,1000
+Interventional Radiology,4,0,8629239.875,2023,1000
+Nuclear Medicine,4,0,15718028.0,2023,1000
+Physical Therapist in Private Practice,4,0,17824480.5625,2023,1000
+Cardiology,3,0,7489866.930000305,2023,1000
+Orthopedic Surgery,3,0,6029441.875,2023,1000
+Pain Management,3,0,7164411.875,2023,1000
+Colorectal Surgery (Proctology),2,0,4724420.25,2023,1000
+Geriatric Medicine,2,0,25703125.5,2023,1000
+Interventional Pain Management,2,0,4765418.0,2023,1000
+Obstetrics & Gynecology,2,0,720726.75,2023,1000
+Pediatric Medicine,2,0,4701861.4921875,2023,1000
+Physical Medicine and Rehabilitation,2,0,1418800.21875,2023,1000
+Psychiatry,2,0,4324579.5,2023,1000
+Pulmonary Disease,2,0,13187093.25,2023,1000
+Undersea and Hyperbaric Medicine,2,0,8818908.5,2023,1000
+Urology,2,0,6480913.0,2023,1000
+Allergy/ Immunology,1,0,774502.8125,2023,1000
+Certified Clinical Nurse Specialist,1,0,5295705.5,2023,1000
+Critical Care (Intensivists),1,0,145909.234375,2023,1000
+Endocrinology,1,0,530034.5,2023,1000
+Hematopoietic Cell Transplantation and Cellular Therapy,1,0,3361899.5,2023,1000
+Hospice and Palliative Care,1,0,584172.9375,2023,1000
+Nephrology,1,0,2051572.875,2023,1000
+Optometry,1,0,541339.25,2023,1000
+Osteopathic Manipulative Medicine,1,0,5566721.0,2023,1000
+Otolaryngology,1,0,419330.46875,2023,1000
+Sports Medicine,1,0,284471.34375,2023,1000
+Surgical Oncology,1,0,214055.59375,2023,1000

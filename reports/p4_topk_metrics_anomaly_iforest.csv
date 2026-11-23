@@ -1,0 +1,7 @@
+year,approach,K,common_pool_size,common_pool_positives,full_eligible_size,full_eligible_positives,unscored_eligible,unscored_positives,hits_at_k,precision_at_k,recall_at_k,lift_at_k,audits_per_hit,full_pool_recall_at_k,cutoff_tie_size,selected_from_cutoff_tie,positives_in_cutoff_tie,min_hits_over_tie_orders,max_hits_over_tie_orders
+2022,anomaly_iforest,100,1165640,82,1230281,86,64641,4,0,0.0,0.0,0.0,,0.0,1,1,0,0,0
+2022,anomaly_iforest,500,1165640,82,1230281,86,64641,4,0,0.0,0.0,0.0,,0.0,1,1,0,0,0
+2022,anomaly_iforest,1000,1165640,82,1230281,86,64641,4,0,0.0,0.0,0.0,,0.0,1,1,0,0,0
+2023,anomaly_iforest,100,1196525,58,1259333,61,62808,3,0,0.0,0.0,0.0,,0.0,1,1,0,0,0
+2023,anomaly_iforest,500,1196525,58,1259333,61,62808,3,1,0.002,0.017241379310344827,41.25948275862069,500.0,0.01639344262295082,1,1,0,1,1
+2023,anomaly_iforest,1000,1196525,58,1259333,61,62808,3,1,0.001,0.017241379310344827,20.629741379310346,1000.0,0.01639344262295082,1,1,0,1,1
