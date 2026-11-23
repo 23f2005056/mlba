@@ -1,6 +1,6 @@
 # FraudLens P4 evaluation summary
 
-**Status: P4 calculations complete; P1, P2 and P3 handoffs confirmed.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P2 confirmed the individual-practitioner feature file and both payment baseline fields. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. P1's additional independent metrics reconcile except for one tie-dependent 1% cutoff, whose exact convention awaits P1's confirmation. The team supplied no fixed audit budget or cost, so P4 reports audit yield at all three K values without selecting one.
+**Status: P4 calculations complete; P1, P2 and P3 handoffs confirmed.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P2 confirmed the individual-practitioner feature file and both payment baseline fields. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. P1 confirmed its checker used `np.argsort(-s)` without a secondary key for equal scores; it will rerun with P4's deterministic NPI tie rule. The team supplied no fixed audit budget or cost, so P4 reports audit yield at all three K values without selecting one.
 
 ## Decision evaluated
 
@@ -12,7 +12,7 @@ Every model and baseline uses the same P1 evaluation pool within each year: elig
 
 LightGBM and logistic regression scores are predicted probabilities of later exclusion. Isolation Forest is fitted separately to each decision year's billing features, which P3 says are available at the decision date, without exclusion labels. Its anomaly score was negated so more unusual billing ranks higher; that score is not a probability. P3 chose supervised settings on 2020 validation only, kept Isolation Forest settings fixed, and used matured labels from 2013–2020 for the supervised 2022 models and 2013–2021 for the supervised 2023 models. P3 confirms neither test year was used to choose model settings.
 
-Every ranking sorts by score descending, then NPI ascending when scores tie. This fixed tie rule uses no outcome information. P3 reports that final LightGBM has 13 trees, so tied scores can occur. P4 checked the minimum and maximum possible hit counts across cutoff tie orders. At fixed K=100/500/1,000, the held-out hit counts do not depend on tie order; at 2022's 1% cutoff, the LightGBM hit count can be 18 or 19. The large 2020 validation ties remain a separate sensitivity issue and did not determine K.
+Every ranking sorts by score descending, then NPI ascending when scores tie. NPIs are ten-digit strings, so ascending string order matches ascending numeric order. This fixed tie rule uses no outcome information. P3 reports that final LightGBM has 13 trees, so tied scores can occur. P4 checked the minimum and maximum possible hit counts across cutoff tie orders. At fixed K=100/500/1,000, the held-out hit counts do not depend on tie order; at 2022's 1% cutoff, the LightGBM hit count can be 18 or 19. The large 2020 validation ties remain a separate sensitivity issue and did not determine K.
 
 ## Held-out results
 
@@ -52,7 +52,7 @@ P1's cutoffs inspect much larger lists than fixed K: the top 1% selects 11,657 p
 | 2023 | LightGBM | 0.745 | 10.3% (6/58) | 34.5% (20/58) |
 | 2023 | Logistic regression | 0.756 | 10.3% (6/58) | 37.9% (22/58) |
 
-All P1 AUCs and 1%/5% recalls reconcile after rounding except 2022 LightGBM Recall@1%: P1 reported 18/82 = 22.0%, while the fixed NPI tie rule selects 19/82 = 23.2%. The cutoff splits a 77-provider equal-score group, of which 49 are selected and one has a positive label. Either 18 or 19 hits is possible under a different within-tie order. This is a tie convention, not a population or model-score mismatch. Its Recall@5% agrees at 33/82 = 40.2%.
+All P1 AUCs and 1%/5% recalls reconcile after rounding except 2022 LightGBM Recall@1%: P1 reported 18/82 = 22.0%, while the fixed NPI tie rule selects 19/82 = 23.2%. The cutoff splits a 77-provider equal-score group, of which 49 are selected and one has a positive label. P1 confirmed its checker used `np.argsort(-s)` without a secondary tie key and will align it to P4's score-descending/NPI-ascending rule. This explains the tie-dependent difference; its Recall@5% agrees at 33/82 = 40.2%.
 
 For these broader cutoffs, P4 resampled the same 113 distinct positive NPIs 20,000 times across both years, retaining every record of a sampled NPI together. The paired bootstrap intervals for LightGBM minus logistic regression include zero for year-weighted AUC, Recall@1%, and Recall@5% across both years. Thus the broader-cutoff evidence does not establish either supervised model as the unique winner. Some pooled supervised-versus-Isolation-Forest intervals exclude zero, conditional on the observed negative scores and fixed rankings. These intervals do not account for negative-provider sampling, retraining, or future-year drift.
 

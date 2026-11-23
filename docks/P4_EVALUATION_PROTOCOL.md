@@ -110,6 +110,8 @@ generator against these paths.
   full evaluation pool, taking `ceil(q × N)` rows for q = 0.01 and 0.05, and
   reporting cutoff-tie hit bounds. At 2022 LightGBM 1%, a 77-provider tie
   straddles the cutoff: P1's 18 and P4's 19 hits are both within the bound.
+  P1 confirmed its checker sorted descending scores with `np.argsort(-s)`
+  but had no secondary tie key; P1 will adopt P4's ascending ten-digit NPI key.
 - For percentage-cutoff uncertainty, resample the same 113 outcome-positive
   NPIs across both years, retaining repeated provider records together. The
   paired bootstrap uses 20,000 shared draws. AUC bootstrap contributions use
@@ -156,8 +158,9 @@ optimal without a capacity or cost/value decision rule.
    training-year split are confirmed in the team handoff. Keep that contract
    fixed if predictions are regenerated.
 
-The P4 evaluation and P1's additional metric reconciliation are complete,
-subject to confirming P1's exact 2022 LightGBM 1% tie convention. The P1 file
+The P4 evaluation and P1's additional metric reconciliation are complete.
+P1 has identified its differing tie convention and plans to rerun its checker
+with P4's deterministic rule. The P1 file
 comparison is optional because its published key rule and counts already
 reconcile. The pilot recommendation is not an operational model or budget
 decision. Changes to the outcome horizon require matching predictions from P3.
