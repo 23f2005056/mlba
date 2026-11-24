@@ -1,0 +1,7 @@
+year,K,common_pool_size,common_pool_positives,hits_lgbm,hits_logreg,hits_iforest,providers_in_any_shortlist,providers_in_all_three_shortlists,distinct_hits_in_any_shortlist,hits_found_only_by_lgbm,hits_found_only_by_logreg,hits_found_only_by_iforest
+2022,100,1165640,82,1,1,0,293,0,1,0,0,0
+2022,500,1165640,82,3,2,0,1440,0,3,1,0,0
+2022,1000,1165640,82,3,3,0,2792,3,4,1,1,0
+2023,100,1196525,58,0,0,0,300,0,0,0,0,0
+2023,500,1196525,58,0,0,1,1468,0,1,0,0,1
+2023,1000,1196525,58,1,0,1,2854,0,2,1,0,1
