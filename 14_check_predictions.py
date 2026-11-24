@@ -48,9 +48,20 @@ for a in sorted(pred[app_c].unique()):
         s = d[score_c].values; yv = d[COL].values
         r = pd.Series(s).rank(method="average").values
         auc = (r[yv == 1].sum() - P * (P + 1) / 2) / (P * (N - P))
-        o = np.argsort(-s)
-        rec1 = yv[o[: max(1, int(N * 0.01))]].sum() / P
-        rec5 = yv[o[: max(1, int(N * 0.05))]].sum() / P
+        # Deterministic ranking:
+        # 1. Score descending
+        # 2. Ten-digit NPI ascending for equal scores
+
+        npi = d["npi"].astype(str).str.strip().str.zfill(10).to_numpy()
+
+        o = np.lexsort((npi, -s))
+
+        # Select exactly the ceiling of the specified pool percentages
+        k1 = int(np.ceil(len(pool) * 0.01))
+        k5 = int(np.ceil(len(pool) * 0.05))
+
+        rec1 = yv[o[:k1]].sum() / P
+        rec5 = yv[o[:k5]].sum() / P
         rows.append(dict(approach=a, year=y, pool=len(pool), coverage=round(cov, 4), positives=P, auc=round(auc, 3),
                          recall_1pct=round(rec1, 3), lift_1pct=round(rec1 / 0.01, 1),
                          recall_5pct=round(rec5, 3), lift_5pct=round(rec5 / 0.05, 1)))
