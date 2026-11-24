@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator, PercentFormatter
 import numpy as np
 import pandas as pd
+from sklearn.metrics import average_precision_score
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,6 +26,7 @@ MODELS = ("supervised_lgbm", "supervised_logreg", "anomaly_iforest")
 PAYMENT_BASELINES = ("highest_total_payment", "highest_payment_per_beneficiary")
 PEER_BASELINES = ("p1_baseline_pymt_per_bene_peer_z", "p1_baseline_srvcs_per_bene_peer_z")
 BASELINES = PAYMENT_BASELINES + PEER_BASELINES
+PEER_SERVICES_DELTA = "incremental_hits_vs_p1_baseline_srvcs_per_bene_peer_z"
 YEARS = (2022, 2023)
 KS = (100, 500, 1000)
 NAMES = {
@@ -73,6 +75,58 @@ def load_results() -> pd.DataFrame:
         if group["pool_size"].nunique() != 1 or group["positive_count"].nunique() != 1:
             raise ValueError(f"Unequal evaluation populations for {year}, K={k}")
     return results.sort_values(["year", "K", "approach"]).reset_index(drop=True)
+
+
+def audit_workload_metrics(results: pd.DataFrame) -> pd.DataFrame:
+    keys = ["year", "K", "approach"]
+    summaries = pd.concat([
+        pd.read_csv(REPORTS / f"p4_{tag}_shortlist_summary.csv")
+        for tag in ("lightgbm", "logreg", "iforest")
+    ])
+    require_complete(summaries, MODELS)
+    models = results.loc[results["approach"].isin(MODELS), keys + ["hits_at_k", "audits_per_hit"]]
+    audit = models.merge(
+        summaries[keys + ["hits_at_k", "observed_medicare_payment_sum"]],
+        on=keys, validate="one_to_one", suffixes=("", "_profile"),
+    )
+    if not audit["hits_at_k"].eq(audit["hits_at_k_profile"]).all():
+        raise ValueError("Shortlist profile and model results disagree on hits")
+    audit = audit.drop(columns="hits_at_k_profile").rename(columns={
+        "audits_per_hit": "reviews_per_later_exclusion",
+        "observed_medicare_payment_sum": "medicare_billing_exposure_usd",
+    })
+    if not np.isfinite(audit["medicare_billing_exposure_usd"]).all():
+        raise ValueError("Missing or non-finite shortlist payments")
+    baseline_hits = results.loc[results["approach"].isin(BASELINES)].pivot(
+        index=["year", "K"], columns="approach", values="hits_at_k",
+    )
+    audit = audit.join(baseline_hits, on=["year", "K"], validate="many_to_one")
+    for baseline in BASELINES:
+        audit[f"incremental_hits_vs_{baseline}"] = audit["hits_at_k"] - audit.pop(baseline)
+    return audit
+
+
+def full_ranking_metrics(results: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+    score_columns = {model: f"score_{model}" for model in MODELS}
+    for year in YEARS:
+        cohort = pd.read_parquet(
+            DATA / f"cohort_{year}.parquet", columns=["year", "y_A_h2", *score_columns.values()],
+        )
+        labels = cohort["y_A_h2"]
+        if not cohort["year"].eq(year).all() or not labels.isin([0, 1]).all():
+            raise ValueError(f"Unexpected evaluation year or label in {year} cohort")
+        pool_size, positive_count = len(labels), int(labels.sum())
+        yearly = results.loc[results["year"].eq(year)]
+        if not (yearly["pool_size"].eq(pool_size) & yearly["positive_count"].eq(positive_count)).all():
+            raise ValueError(f"Average Precision population differs from fixed-K results for {year}")
+        for model, col in score_columns.items():
+            rows.append({
+                "year": year, "approach": model, "pool_size": pool_size, "positive_count": positive_count,
+                "average_precision": average_precision_score(labels, cohort[col]),
+                "pool_prevalence_reference": positive_count / pool_size,
+            })
+    return pd.DataFrame(rows)
 
 
 def save_shortlists() -> None:
@@ -164,7 +218,10 @@ def chart_coverage(coverage: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: pd.DataFrame, paired: pd.DataFrame) -> None:
+def markdown_report(
+    results: pd.DataFrame, coverage: pd.DataFrame, paired: pd.DataFrame,
+    workload: pd.DataFrame, rankings: pd.DataFrame,
+) -> None:
     percent = pd.read_csv(REPORTS / "p4_p1_percentage_reconciliation.csv")
     percent_pairs = pd.read_csv(REPORTS / "p4_p1_percentage_paired_bootstrap.csv")
     if len(percent) != 10 or len(percent_pairs) != 27:
@@ -235,11 +292,46 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
         "",
         "The broader candidate pool includes organisations and is **not** the test denominator. P2 says candidates without features are mainly organisations. The 4 and 3 positive records outside the individual evaluation pool were not scored because they had no P2 feature row; their specific entity types cannot be verified because the local candidate file has no entity-type column. Within the evaluation pool, score coverage is 100%. Shortlist Medicare payment totals describe historical billing exposure only; no audit cost, adjudicated fraud, recoverable payment, or savings measure is available.",
         "",
+        "## Evidence for the audit pilot",
+        "",
+        "Incremental yield is the model's later exclusions captured minus the number captured by a Medicare billing rule at the same year and K. The example uses P1's peer-adjusted services-per-beneficiary rule. The workload table includes comparisons against all four billing rules at K=100, 500 and 1,000.",
+        "",
+        "| Year | Model at K=500 | Additional exclusions vs. the peer services rule | Shortlist places per later exclusion | Historical Medicare payments |",
+        "|---|---|---:|---:|---:|",
+    ]
+    for row in workload.loc[workload["K"].eq(500)].to_dict(orient="records"):
+        reviews = row["reviews_per_later_exclusion"]
+        reviews_text = "—" if pd.isna(reviews) else f"{reviews:,.1f}"
+        lines.append(
+            f"| {row['year']} | {NAMES[row['approach']]} | {int(row[PEER_SERVICES_DELTA]):+d} "
+            f"| {reviews_text} | ${row['medicare_billing_exposure_usd']:,.0f} |"
+        )
+    lines += [
+        "",
+        "Shortlist places per later exclusion = K divided by the historical exclusions captured. A dash indicates zero observed exclusions. Medicare payments describe the historical dollars associated with the shortlist.",
+        "",
+        "Average Precision (AP) summarises how well the full ranking concentrates the rare exclusion outcome across score thresholds. P4 uses scikit-learn's non-interpolated Average Precision and displays each year's outcome prevalence as the random reference. Research on Medicare fraud detection has used the related precision–recall area metric, with different datasets and evaluation protocols ([Leevy et al.](https://doi.org/10.1080/1206212X.2024.2431874)).",
+        "",
+        "| Test year | LightGBM AP | Logistic regression AP | Isolation Forest AP | Pool prevalence reference |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for year in YEARS:
+        annual = rankings.loc[rankings["year"].eq(year)].set_index("approach")
+        values = " | ".join(f"{annual.loc[model, 'average_precision']:.5%}" for model in MODELS)
+        lines.append(f"| {year} | {values} | {annual['pool_prevalence_reference'].iloc[0]:.5%} |")
+    pair = paired.loc[
+        paired["year"].eq(2022) & paired["K"].eq(500)
+        & paired["model_a"].eq(MODELS[0]) & paired["model_b"].eq(MODELS[1])
+    ].iloc[0]
+    lines += [
+        "",
+        f"At K=500 in 2022, the paired LightGBM-minus-logistic-regression difference was {pair.hit_difference_a_minus_b:+.0f} later exclusion, with a 95% interval from {pair.hit_difference_bootstrap_ci95_low:.0f} to {pair.hit_difference_bootstrap_ci95_high:.0f}. LightGBM had the highest observed AP in both years. AP is descriptive here; the fixed-K paired intervals quantify the uncertainty in the shortlist comparisons.",
+        "",
         "## Provisional recommendation",
         "",
         "Carry **both LightGBM and logistic regression** as candidates into a prospective audit pilot; the NPI-clustered percentage-cutoff comparisons do not establish a unique supervised-model winner. Keep Isolation Forest as an additional comparator because it found a different 2023 hit at K=500. Do not deploy a combined list or claim a proven operational winner from these retrospective results. Report K=100, 500, and 1,000 as alternative narrow-list workloads; separately report P1's 1% and 5% capacities. Select a single operational capacity only after an audit team states its review capacity or audit cost/value rule; do not tune capacity on the 2022/2023 test outcomes.",
         "",
-        "A prospective pilot should record audited providers, confirmed findings, audit cost, and recoveries. Those observations are needed to estimate actual business value. Historical Medicare payments are not a savings estimate.",
+        "A prospective pilot should record completed reviews, confirmed findings, review costs, and actual recoveries. Report dollars recovered per 100 completed reviews and compare recoveries with review costs. Overpayment recoveries are an operational measure in [GAO's Medicare program integrity report](https://files.gao.gov/reports/GAO-26-107799/index.html).",
         "",
         "## Presentation figures and source tables",
         "",
@@ -249,6 +341,7 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
         "- [P4 PowerPoint section](../presentation_figures/FraudLens_P4_Evaluation.pptx)",
         "- [Interactive dashboard](p4_dashboard.html)",
         "- [Consolidated results](p4_results.csv), [top-K shortlists](p4_top_k_shortlists.csv), [model comparison](p4_model_comparison.csv)",
+        "- [Audit workload metrics](p4_audit_workload_metrics.csv), [Average Precision by year and model](p4_average_precision.csv)",
         "- [P1 percentage-cutoff reconciliation](p4_p1_percentage_reconciliation.csv), [P1 peer baselines at fixed K](p4_p1_peer_baseline_topk.csv), [NPI bootstrap intervals](p4_p1_percentage_bootstrap.csv), [paired bootstrap differences](p4_p1_percentage_paired_bootstrap.csv)",
         "- [Per-year paired uncertainty](p4_model_paired_uncertainty.csv), [NPI-clustered pooled check](p4_pooled_npi_uncertainty.csv), [random benchmark](p4_seeded_random_baseline.csv), [coverage](p4_scoring_coverage_summary.csv)",
         "",
@@ -263,10 +356,17 @@ def markdown_report(results: pd.DataFrame, coverage: pd.DataFrame, comparison: p
     (REPORTS / "p4_evaluation_summary.md").write_text("\n".join(lines), encoding="utf-8")
 
 
-def dashboard(results: pd.DataFrame, coverage: pd.DataFrame) -> None:
+def dashboard(
+    results: pd.DataFrame, coverage: pd.DataFrame, paired: pd.DataFrame,
+    workload: pd.DataFrame, rankings: pd.DataFrame,
+) -> None:
     shown_rows = results.loc[results["approach"].isin(MODELS + BASELINES)].copy()
     data = shown_rows[["year", "approach", "K", "hits_at_k", "precision_at_k", "recall_at_k", "lift_at_k"]].to_dict(orient="records")
     covered = coverage[["year", "individual_eval_pool", "score_coverage_within_eval_pool", "upstream_candidates_outside_eval_pool", "upstream_positive_records_outside_eval_pool"]].to_dict(orient="records")
+    audit = workload[["year", "approach", "K", PEER_SERVICES_DELTA, "reviews_per_later_exclusion",
+                      "medicare_billing_exposure_usd"]].rename(columns={PEER_SERVICES_DELTA: "peer_delta"})
+    intervals = paired[["year", "K", "model_a", "model_b", "hit_difference_a_minus_b",
+                        "hit_difference_bootstrap_ci95_low", "hit_difference_bootstrap_ci95_high"]]
     page = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FraudLens P4 evaluation</title>
@@ -276,19 +376,43 @@ def dashboard(results: pd.DataFrame, coverage: pd.DataFrame) -> None:
 <div class="note"><strong>P4 evaluation complete:</strong> P1, P2 and P3 handoffs are confirmed. Model differences remain uncertain. With no fixed audit budget or cost, all three K values are shown.</div>
 <div class="controls"><label>Year <select id="year"><option>2022</option><option>2023</option></select></label><label>Top K <select id="k"><option>100</option><option selected>500</option><option>1000</option></select></label></div>
 <div class="card"><h2>Model and baseline comparison</h2><table><thead><tr><th>Method</th><th>Hits</th><th>Precision</th><th>Recall</th><th>Lift</th></tr></thead><tbody id="rows"></tbody></table><p id="coverage"></p></div>
+<div class="card" style="overflow-x:auto"><h2>Evidence for the audit pilot</h2>
+<table><thead><tr><th>Model</th><th>Additional exclusions vs. peer services rule</th><th>Shortlist places per exclusion</th><th>Historical Medicare payments</th><th>Average Precision (full year)</th></tr></thead><tbody id="audit"></tbody></table>
+<p id="ap-reference"></p><p>A dash indicates no observed exclusions. Medicare payments describe historical billing exposure.</p>
+<h3>Paired differences in later exclusions</h3>
+<table><thead><tr><th>Model comparison</th><th>Observed difference</th><th>95% interval</th></tr></thead><tbody id="paired"></tbody></table>
+<p>Differences are model A minus model B. Intervals that include zero leave room for a tie.</p>
+<p><a href="p4_audit_workload_metrics.csv">Download all four billing-rule comparisons</a> · <a href="p4_average_precision.csv">Download Average Precision by year</a></p></div>
 <div class="grid"><div class="card"><h2>Hits by workload</h2><img src="../presentation_figures/p4_hits_by_k.png" alt="Hits by K and year"></div><div class="card"><h2>Precision by workload</h2><img src="../presentation_figures/p4_precision_by_k.png" alt="Precision by K and year"></div></div>
 <div class="card"><h2>Evaluation pool</h2><img src="../presentation_figures/p4_scoring_coverage.png" alt="Share of upstream providers and positive records in the individual evaluation pool"></div>
 <p>The two raw-payment rules found zero hits at the displayed capacities; P1's peer-adjusted services baseline found one 2022 hit. Random selection almost always found zero. The larger 1% and 5% lists, including AUC and bootstrap intervals, are in <a href="p4_evaluation_summary.md">the evaluation summary</a>.</p>
 </main><script>
 const data=__DATA__; const coverage=__COVERAGE__;
+const audit=__AUDIT__, rankings=__RANKINGS__, paired=__PAIRED__;
 const names={supervised_lgbm:'LightGBM',supervised_logreg:'Logistic regression',anomaly_iforest:'Isolation Forest',highest_total_payment:'Highest total payment',highest_payment_per_beneficiary:'Highest payment per beneficiary',p1_baseline_pymt_per_bene_peer_z:'P1 peer payment/beneficiary',p1_baseline_srvcs_per_bene_peer_z:'P1 peer services/beneficiary'};
+const dollars=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+const signed=n=>n>0?'+'+n:String(n);
+const percent=n=>(100*n).toFixed(5)+'%';
 function render(){const year=Number(document.getElementById('year').value),k=Number(document.getElementById('k').value);
  const selected=data.filter(r=>r.year===year&&r.K===k); const order=['supervised_lgbm','supervised_logreg','anomaly_iforest','highest_total_payment','highest_payment_per_beneficiary','p1_baseline_pymt_per_bene_peer_z','p1_baseline_srvcs_per_bene_peer_z'];
  document.getElementById('rows').innerHTML=order.map(a=>{const r=selected.find(x=>x.approach===a);return `<tr><td>${names[a]}</td><td>${r.hits_at_k}</td><td>${(100*r.precision_at_k).toFixed(2)}%</td><td>${(100*r.recall_at_k).toFixed(2)}%</td><td>${r.lift_at_k.toFixed(1)}×</td></tr>`}).join('');
+ const annual=rankings.filter(r=>r.year===year);
+ document.getElementById('audit').innerHTML=annual.map(a=>{
+   const r=audit.find(x=>x.approach===a.approach&&x.year===year&&x.K===k);
+   const reviews=r.reviews_per_later_exclusion===null?'—':r.reviews_per_later_exclusion.toFixed(1);
+   return `<tr><td>${names[a.approach]}</td><td>${signed(r.peer_delta)}</td><td>${reviews}</td><td>${dollars.format(r.medicare_billing_exposure_usd)}</td><td>${percent(a.average_precision)}</td></tr>`;
+ }).join('');
+ document.getElementById('ap-reference').textContent=`Average Precision uses the full ${year} ranking. Random reference (pool prevalence) ${percent(annual[0].pool_prevalence_reference)}.`;
+ document.getElementById('paired').innerHTML=paired.filter(r=>r.year===year&&r.K===k).map(r=>
+   `<tr><td>${names[r.model_a]} − ${names[r.model_b]}</td><td>${signed(r.hit_difference_a_minus_b)}</td><td>${signed(r.hit_difference_bootstrap_ci95_low)} to ${signed(r.hit_difference_bootstrap_ci95_high)}</td></tr>`
+ ).join('');
  const c=coverage.find(x=>x.year===year);document.getElementById('coverage').textContent=`The individual evaluation pool has ${c.individual_eval_pool.toLocaleString()} providers; all have three model scores. Another ${c.upstream_candidates_outside_eval_pool.toLocaleString()} upstream eligible candidates are unscored and outside this test denominator, including ${c.upstream_positive_records_outside_eval_pool} positive records.`}
 document.getElementById('year').addEventListener('change',render);document.getElementById('k').addEventListener('change',render);render();
 </script></body></html>"""
     page = page.replace("__DATA__", json.dumps(data)).replace("__COVERAGE__", json.dumps(covered))
+    page = page.replace("__AUDIT__", audit.to_json(orient="records", double_precision=15))
+    page = page.replace("__RANKINGS__", rankings.to_json(orient="records", double_precision=15))
+    page = page.replace("__PAIRED__", intervals.to_json(orient="records"))
     (REPORTS / "p4_dashboard.html").write_text(page, encoding="utf-8")
 
 
@@ -307,12 +431,16 @@ def main() -> None:
         raise ValueError("Report text about uncertainty needs revision")
     if not ((pooled["provider_cluster_bootstrap_ci95_low"] <= 0) & (pooled["provider_cluster_bootstrap_ci95_high"] >= 0)).all():
         raise ValueError("Pooled NPI uncertainty text needs revision")
+    workload = audit_workload_metrics(results)
+    rankings = full_ranking_metrics(results)
+    workload.to_csv(REPORTS / "p4_audit_workload_metrics.csv", index=False)
+    rankings.to_csv(REPORTS / "p4_average_precision.csv", index=False)
     comparison.to_csv(REPORTS / "p4_model_comparison.csv", index=False)
     chart_lines(results, "hits_at_k", "Later exclusions in top-K shortlists", "Hits", "p4_hits_by_k.png")
     chart_lines(results, "precision_at_k", "Audit-list yield by capacity", "Precision@K", "p4_precision_by_k.png", percentage=True)
     chart_coverage(coverage)
-    markdown_report(results, coverage, comparison, paired)
-    dashboard(results, coverage)
+    markdown_report(results, coverage, paired, workload, rankings)
+    dashboard(results, coverage, paired, workload, rankings)
     print("Saved consolidated P4 outputs, three figures, dashboard, and evaluation report")
 
 

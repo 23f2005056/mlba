@@ -4,12 +4,13 @@
 
 - Held-out 2022 and 2023 evaluation of LightGBM, logistic regression and Isolation Forest at K = 100, 500 and 1,000, plus P1's top 1% and top 5% comparisons and ROC-AUC.
 - Two raw-payment, two P1 peer-adjusted and seeded-random baselines, top-K metrics, uncertainty, shortlist overlap, specialty summaries and evaluation-pool coverage within upstream candidates.
+- `reports/p4_audit_workload_metrics.csv` gives incremental exclusions versus each billing rule, shortlist places per later exclusion, and historical Medicare billing exposure for each model, year, and K. `reports/p4_average_precision.csv` gives full-ranking Average Precision for each model and year, with pool prevalence as the random reference.
 - `reports/p4_p1_percentage_reconciliation.csv`: P1's AUC and percentage-cutoff claims beside the recalculation, including cutoff-tie bounds.
 - `reports/p4_p1_percentage_bootstrap.csv` and `reports/p4_p1_percentage_paired_bootstrap.csv`: positive-provider NPI-clustered intervals across both years, conditional on observed negative-provider scores.
 - `reports/p4_evaluation_summary.md`: final P4 analysis and limitations.
 - `reports/p4_dashboard.html`: local interactive view of year and K results.
 - `reports/p4_results.csv`, `reports/p4_top_k_shortlists.csv` and `reports/p4_model_comparison.csv`: consolidated deliverables.
-- `presentation_figures/FraudLens_P4_Evaluation.pptx`: six-slide **P4 section** for the team deck. Two results charts are editable PowerPoint charts.
+- `presentation_figures/FraudLens_P4_Evaluation.pptx`: seven-slide **P4 section** for the team deck, with the evidence behind the pilot recommendation on slide 6. Two results charts are editable PowerPoint charts.
 - `presentation_figures/*.png`: standalone figures for slides or report reuse.
 - `reports/p4_pooled_npi_uncertainty.csv`: supplementary paired comparison
   across both years, resampled by distinct provider NPI.

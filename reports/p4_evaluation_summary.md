@@ -75,11 +75,35 @@ The supplemental pooled AUC is the positive-record-weighted average of the two y
 
 The broader candidate pool includes organisations and is **not** the test denominator. P2 says candidates without features are mainly organisations. The 4 and 3 positive records outside the individual evaluation pool were not scored because they had no P2 feature row; their specific entity types cannot be verified because the local candidate file has no entity-type column. Within the evaluation pool, score coverage is 100%. Shortlist Medicare payment totals describe historical billing exposure only; no audit cost, adjudicated fraud, recoverable payment, or savings measure is available.
 
+## Evidence for the audit pilot
+
+Incremental yield is the model's later exclusions captured minus the number captured by a Medicare billing rule at the same year and K. The example uses P1's peer-adjusted services-per-beneficiary rule. The workload table includes comparisons against all four billing rules at K=100, 500 and 1,000.
+
+| Year | Model at K=500 | Additional exclusions vs. the peer services rule | Shortlist places per later exclusion | Historical Medicare payments |
+|---|---|---:|---:|---:|
+| 2022 | Isolation Forest | -1 | — | $840,731,065 |
+| 2022 | LightGBM | +2 | 166.7 | $4,565,052 |
+| 2022 | Logistic regression | +1 | 250.0 | $101,184,949 |
+| 2023 | Isolation Forest | +1 | 500.0 | $1,967,646,344 |
+| 2023 | LightGBM | +0 | — | $71,295,022 |
+| 2023 | Logistic regression | +0 | — | $953,876,018 |
+
+Shortlist places per later exclusion = K divided by the historical exclusions captured. A dash indicates zero observed exclusions. Medicare payments describe the historical dollars associated with the shortlist.
+
+Average Precision (AP) summarises how well the full ranking concentrates the rare exclusion outcome across score thresholds. P4 uses scikit-learn's non-interpolated Average Precision and displays each year's outcome prevalence as the random reference. Research on Medicare fraud detection has used the related precision–recall area metric, with different datasets and evaluation protocols ([Leevy et al.](https://doi.org/10.1080/1206212X.2024.2431874)).
+
+| Test year | LightGBM AP | Logistic regression AP | Isolation Forest AP | Pool prevalence reference |
+|---|---:|---:|---:|---:|
+| 2022 | 0.14486% | 0.09090% | 0.01950% | 0.00703% |
+| 2023 | 0.03435% | 0.02918% | 0.02446% | 0.00485% |
+
+At K=500 in 2022, the paired LightGBM-minus-logistic-regression difference was +1 later exclusion, with a 95% interval from 0 to 3. LightGBM had the highest observed AP in both years. AP is descriptive here; the fixed-K paired intervals quantify the uncertainty in the shortlist comparisons.
+
 ## Provisional recommendation
 
 Carry **both LightGBM and logistic regression** as candidates into a prospective audit pilot; the NPI-clustered percentage-cutoff comparisons do not establish a unique supervised-model winner. Keep Isolation Forest as an additional comparator because it found a different 2023 hit at K=500. Do not deploy a combined list or claim a proven operational winner from these retrospective results. Report K=100, 500, and 1,000 as alternative narrow-list workloads; separately report P1's 1% and 5% capacities. Select a single operational capacity only after an audit team states its review capacity or audit cost/value rule; do not tune capacity on the 2022/2023 test outcomes.
 
-A prospective pilot should record audited providers, confirmed findings, audit cost, and recoveries. Those observations are needed to estimate actual business value. Historical Medicare payments are not a savings estimate.
+A prospective pilot should record completed reviews, confirmed findings, review costs, and actual recoveries. Report dollars recovered per 100 completed reviews and compare recoveries with review costs. Overpayment recoveries are an operational measure in [GAO's Medicare program integrity report](https://files.gao.gov/reports/GAO-26-107799/index.html).
 
 ## Presentation figures and source tables
 
@@ -89,6 +113,7 @@ A prospective pilot should record audited providers, confirmed findings, audit c
 - [P4 PowerPoint section](../presentation_figures/FraudLens_P4_Evaluation.pptx)
 - [Interactive dashboard](p4_dashboard.html)
 - [Consolidated results](p4_results.csv), [top-K shortlists](p4_top_k_shortlists.csv), [model comparison](p4_model_comparison.csv)
+- [Audit workload metrics](p4_audit_workload_metrics.csv), [Average Precision by year and model](p4_average_precision.csv)
 - [P1 percentage-cutoff reconciliation](p4_p1_percentage_reconciliation.csv), [P1 peer baselines at fixed K](p4_p1_peer_baseline_topk.csv), [NPI bootstrap intervals](p4_p1_percentage_bootstrap.csv), [paired bootstrap differences](p4_p1_percentage_paired_bootstrap.csv)
 - [Per-year paired uncertainty](p4_model_paired_uncertainty.csv), [NPI-clustered pooled check](p4_pooled_npi_uncertainty.csv), [random benchmark](p4_seeded_random_baseline.csv), [coverage](p4_scoring_coverage_summary.csv)
 
