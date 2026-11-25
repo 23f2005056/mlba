@@ -212,9 +212,9 @@ def write_report(results: pd.DataFrame) -> None:
         "",
         "## Pilot decision",
         "",
-        "The presentation compares K = 1,000, 2,500 and 5,000. Of these three workloads, 5,000 was the only one where all three models had at least one hit in both years. At K = 2,500, logistic regression still had zero hits in 2023. LightGBM led on hits at K = 5,000 in both years. Increasing K from 2,500 to 5,000 added 7 LightGBM hits in 2022 (5 to 12) and 3 in 2023 (2 to 5).",
+        "The presentation compares K = 1,000, 2,500 and 5,000. P4 chose 5,000 for the detailed exploratory comparison after seeing the test results. Of these three workloads, 5,000 was the only one where all three models had at least one hit in both years. At K = 2,500, Logistic Regression still had zero hits in 2023. LightGBM had the most observed hits at K = 5,000 in both years. Increasing K from 2,500 to 5,000 added 7 LightGBM hits in 2022 (5 to 12) and 3 in 2023 (2 to 5).",
         "",
-        "Use available audit capacity to set the pilot K. If 5,000 reviews are feasible, lead with LightGBM and compare it with logistic regression, Isolation Forest, and the current billing rule at the same workload. Validate the exploratory finding prospectively. Payment exposure can be concentrated in a few providers. Track actual recoveries and measured review costs.",
+        "Pilot LightGBM and Logistic Regression at the same K, set by the audit team's available review capacity. Compare both against the current billing rule and use the pilot results to decide which model to deploy. Payment exposure can be concentrated in a few providers. Track actual recoveries and measured review costs.",
         "",
         "Net benefit is measured financial benefit minus review and measurable friction costs. ROI is net benefit divided by those costs. The historical test data supply billing exposure and later exclusion outcomes.",
         "",
@@ -242,7 +242,7 @@ def write_dashboard(results: pd.DataFrame) -> None:
 <table><thead><tr><th scope="col">Method</th><th scope="col">Hits</th><th scope="col">Precision</th><th scope="col">Recall</th><th scope="col">Lift</th><th scope="col">Payment exposure</th><th scope="col">Payment-Exposure Recall@K</th><th scope="col">Exposure per shortlist place</th><th scope="col">Value-weighted lift</th></tr></thead><tbody id="rows"></tbody></table>
 <p>Exposure intervals use 20,000 bootstrap resamples of later-excluded NPIs within each year and hold the shortlists fixed. At small K, a handful of providers can drive the results.</p></section>
 <section><h2>Hits and precision at K = 1,000, 2,500 and 5,000</h2><img src="../presentation_figures/p4_hits_by_k.png" alt="Model hits by K and test year"><img src="../presentation_figures/p4_precision_by_k.png" alt="Model precision by K and test year"></section>
-<section><h2>Pilot recommendation</h2><p>Of the three workloads presented, 5,000 was the only one where all models had hits in both years. LightGBM led on hits at 5,000 in both years. If the audit team has that capacity, lead the pilot with LightGBM and compare methods at the same workload. Measure actual recoveries per review, net savings and ROI using audit outcomes and costs.</p><a href="p4_results.csv">Download results</a> · <a href="p4_evaluation_summary.md">Read the evaluation report</a></section>
+<section><h2>Pilot recommendation</h2><p>We chose K = 5,000 for the detailed exploratory comparison after seeing the test results. LightGBM had the most observed hits in both years at that workload. Pilot LightGBM and Logistic Regression against the current billing rule at the same K, based on the audit team’s capacity. Measure actual recoveries per review, net savings and ROI using audit outcomes and costs.</p><a href="p4_results.csv">Download results</a> · <a href="p4_evaluation_summary.md">Read the evaluation report</a></section>
 <script>
 const data=__DATA__;
 const names=__NAMES__;

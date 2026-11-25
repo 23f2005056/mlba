@@ -60,9 +60,9 @@ The table gives the three model rankings. The consolidated CSV also includes the
 
 ## Pilot decision
 
-The presentation compares K = 1,000, 2,500 and 5,000. Of these three workloads, 5,000 was the only one where all three models had at least one hit in both years. At K = 2,500, logistic regression still had zero hits in 2023. LightGBM led on hits at K = 5,000 in both years. Increasing K from 2,500 to 5,000 added 7 LightGBM hits in 2022 (5 to 12) and 3 in 2023 (2 to 5).
+The presentation compares K = 1,000, 2,500 and 5,000. P4 chose 5,000 for the detailed exploratory comparison after seeing the test results. Of these three workloads, 5,000 was the only one where all three models had at least one hit in both years. At K = 2,500, Logistic Regression still had zero hits in 2023. LightGBM had the most observed hits at K = 5,000 in both years. Increasing K from 2,500 to 5,000 added 7 LightGBM hits in 2022 (5 to 12) and 3 in 2023 (2 to 5).
 
-Use available audit capacity to set the pilot K. If 5,000 reviews are feasible, lead with LightGBM and compare it with logistic regression, Isolation Forest, and the current billing rule at the same workload. Validate the exploratory finding prospectively. Payment exposure can be concentrated in a few providers. Track actual recoveries and measured review costs.
+Pilot LightGBM and Logistic Regression at the same K, set by the audit team's available review capacity. Compare both against the current billing rule and use the pilot results to decide which model to deploy. Payment exposure can be concentrated in a few providers. Track actual recoveries and measured review costs.
 
 Net benefit is measured financial benefit minus review and measurable friction costs. ROI is net benefit divided by those costs. The historical test data supply billing exposure and later exclusion outcomes.
 
