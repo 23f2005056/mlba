@@ -1,8 +1,8 @@
 """Prepare the common held-out P4 cohort; do not calculate ranking metrics.
 
 Reads the four real Parquet inputs currently supplied under ``stubs/``.
-Writes one compact cohort per test year under ignored ``out/p4/`` and a small
-coverage report under ``reports/``. The old synthetic stub generator must not
+Writes one compact cohort per test year and an input coverage check under
+ignored ``out/p4/``. The old synthetic stub generator must not
 be run against these input paths.
 """
 
@@ -18,7 +18,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 INPUT = ROOT / "stubs"
 OUTPUT = ROOT / "out" / "p4"
-REPORT = ROOT / "reports" / "p4_input_coverage.csv"
+REPORT = OUTPUT / "input_coverage.csv"
 P1_EVAL_POOL_PATHS = (ROOT / "stubs" / "eval_pool.parquet", ROOT / "out" / "eval_pool.parquet")
 TEST_YEARS = (2022, 2023)
 APPROACHES = ("supervised_lgbm", "supervised_logreg", "anomaly_iforest")

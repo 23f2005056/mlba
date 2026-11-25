@@ -1,7 +1,0 @@
-year,approach,K,cutoff_score,cutoff_tie_size,selected_from_cutoff_tie,tie_crosses_cutoff
-2022,supervised_logreg,100,0.9999701976776123,1,1,False
-2022,supervised_logreg,500,0.9965575933456421,1,1,False
-2022,supervised_logreg,1000,0.9891037940979004,1,1,False
-2023,supervised_logreg,100,0.9999091625213623,1,1,False
-2023,supervised_logreg,500,0.9955939650535583,1,1,False
-2023,supervised_logreg,1000,0.9886151552200317,1,1,False

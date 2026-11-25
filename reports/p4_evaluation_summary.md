@@ -1,125 +1,74 @@
-# FraudLens P4 evaluation summary
+# FraudLens P4 evaluation
 
-**Status: P4 calculations complete; P1, P2 and P3 handoffs confirmed.** P1 confirmed Scenario A at a two-year horizon, complete uncensored 2022/2023 labels, and an individual-practitioner evaluation pool. P2 confirmed the individual-practitioner feature file and both payment baseline fields. P3 confirmed the prediction handoff, score direction, and 2020-only setting selection. P1 confirmed its checker used `np.argsort(-s)` without a secondary key for equal scores; it will rerun with P4's deterministic NPI tie rule. The team supplied no fixed audit budget or cost, so P4 reports audit yield at all three K values without selecting one.
+P4 evaluated the saved P3 rankings for 2022 and 2023. The original workloads were K = 100, 500 and 1,000. After examining those results, P4 explored K = 2,500 and 5,000. A hit is a shortlisted individual practitioner who met the two-year Scenario A exclusion outcome.
 
-## Decision evaluated
+LightGBM and Logistic Regression scores rank exclusion risk. They are not calibrated probabilities because training down-sampled negatives and heavily weighted positives. Isolation Forest ranks unusual billing. P4 sorts scores descending and breaks ties by ascending NPI.
 
-At the end of a reporting year, rank eligible providers for audit. A hit is a provider with a later Scenario A LEIE exclusion within the two-year label window (`y_A_h2`). This is a proxy for audit prioritisation, not proven billing fraud or a measured recovery.
+## Metrics
 
-Every model and baseline uses the same P1 evaluation pool within each year: eligible individuals with P2 features. P1's `eval_pool.parquet` was not supplied locally, so P4 reconstructed its published rule from labels and feature keys; the reconstructed keys exactly match P4's test cohorts. All providers in this pool have all three scores. K = 100, 500, and 1,000 are audit-capacity scenarios, not an operationally selected capacity. The 2020 data was used for validation, not for this held-out table.
+| Metric | Calculation |
+|---|---|
+| Hits@K | Later exclusions in the shortlist |
+| Precision@K | Hits divided by K |
+| Recall@K | Hits divided by later exclusions in the year's full pool |
+| Lift@K | Precision divided by the year's pool exclusion rate |
+| Payment-Exposure Recall@K | Captured payments divided by all decision-year Medicare payments to later-excluded providers in the year's pool |
+| Historical payment exposure per shortlist place | Captured payments divided by K |
+| Value-weighted lift@K | Captured payments divided by the exposure expected from K random selections in the same year |
+| Net savings and ROI | Pilot measures based on measured financial benefit, review costs, and measurable friction costs |
 
-## Model scores and tie rule
+Captured payments are Medicare payments to shortlisted providers who were later excluded. P4 verified each payment against P2's `medicare_payment` for the same NPI and decision year as the score.
 
-LightGBM and logistic regression scores rank providers by exclusion risk. They are not calibrated probabilities because training down-sampled negatives and weighted positives heavily. Isolation Forest is fitted separately to each decision year's billing features, which P3 says are available at the decision date, without exclusion labels. Its anomaly score was negated so more unusual billing ranks higher; that score is not a probability. P3 chose supervised settings on 2020 validation only, kept Isolation Forest settings fixed, and used matured labels from 2013–2020 for the supervised 2022 models and 2013–2021 for the supervised 2023 models. P3 confirms neither test year was used to choose model settings.
+The 95% bootstrap intervals use 20,000 resamples of later-excluded NPIs within each year. Each draw is shared across methods, holds the shortlists fixed, and recalculates captured and pool payments. The intervals reflect sensitivity to which later-excluded providers appear in the resample. Zero-hit shortlists yield zero-width intervals under this design. The analytical random expectation has no interval.
 
-Every ranking sorts by score descending, then NPI ascending when scores tie. NPIs are ten-digit strings, so ascending string order matches ascending numeric order. This fixed tie rule uses no outcome information. P3 reports that final LightGBM has 13 trees, so tied scores can occur. P4 checked the minimum and maximum possible hit counts across cutoff tie orders. At fixed K=100/500/1,000, the held-out hit counts do not depend on tie order; at 2022's 1% cutoff, the LightGBM hit count can be 18 or 19. The large 2020 validation ties remain a separate sensitivity issue and did not determine K.
+## Results by year and workload
 
-## Held-out results
+The table gives the three model rankings. The consolidated CSV also includes the four billing rules and the random expectation.
 
-| Year | Method | K=100 hits | K=500 hits | K=1,000 hits |
-|---|---|---:|---:|---:|
-| 2022 | LightGBM | 1 | 3 | 3 |
-| 2022 | Logistic regression | 1 | 2 | 3 |
-| 2022 | Isolation Forest | 0 | 0 | 0 |
-| 2022 | Highest total payment | 0 | 0 | 0 |
-| 2022 | Highest payment per beneficiary | 0 | 0 | 0 |
-| 2022 | P1 peer-adjusted payment per beneficiary | 0 | 0 | 0 |
-| 2022 | P1 peer-adjusted services per beneficiary | 1 | 1 | 1 |
-| 2023 | LightGBM | 0 | 0 | 1 |
-| 2023 | Logistic regression | 0 | 0 | 0 |
-| 2023 | Isolation Forest | 0 | 1 | 1 |
-| 2023 | Highest total payment | 0 | 0 | 0 |
-| 2023 | Highest payment per beneficiary | 0 | 0 | 0 |
-| 2023 | P1 peer-adjusted payment per beneficiary | 0 | 0 | 0 |
-| 2023 | P1 peer-adjusted services per beneficiary | 0 | 0 | 0 |
+| Year | K | Pool reviewed | Model | Hits | Precision | Recall | Lift | Payment exposure | Payment-Exposure Recall@K [95% CI] | Exposure per place [95% CI] | Value-weighted lift [95% CI] |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2022 | 100 | 0.01% | Isolation Forest | 0 | 0.00% | 0.00% | 0.00× | $0.00 | 0.00000% [0.00000%–0.00000%] | $0.00 [$0.00–$0.00] | 0.00× [0.00–0.00×] |
+| 2022 | 100 | 0.01% | LightGBM | 1 | 1.00% | 1.22% | 142.15× | $70.92 | 0.00059% [0.00000%–0.00230%] | $0.71 [$0.00–$2.13] | 0.07× [0.00–0.27×] |
+| 2022 | 100 | 0.01% | Logistic Regression | 1 | 1.00% | 1.22% | 142.15× | $70.92 | 0.00059% [0.00000%–0.00230%] | $0.71 [$0.00–$2.13] | 0.07× [0.00–0.27×] |
+| 2022 | 500 | 0.04% | Isolation Forest | 0 | 0.00% | 0.00% | 0.00× | $0.00 | 0.00000% [0.00000%–0.00000%] | $0.00 [$0.00–$0.00] | 0.00× [0.00–0.00×] |
+| 2022 | 500 | 0.04% | LightGBM | 3 | 0.60% | 3.66% | 85.29× | $1,372.13 | 0.01146% [0.00000%–0.03585%] | $2.74 [$0.00–$7.09] | 0.27× [0.00–0.84×] |
+| 2022 | 500 | 0.04% | Logistic Regression | 2 | 0.40% | 2.44% | 56.86× | $498.15 | 0.00416% [0.00000%–0.01466%] | $1.00 [$0.00–$2.85] | 0.10× [0.00–0.34×] |
+| 2022 | 1,000 | 0.09% | Isolation Forest | 0 | 0.00% | 0.00% | 0.00× | $0.00 | 0.00000% [0.00000%–0.00000%] | $0.00 [$0.00–$0.00] | 0.00× [0.00–0.00×] |
+| 2022 | 1,000 | 0.09% | LightGBM | 3 | 0.30% | 3.66% | 42.65× | $1,372.13 | 0.01146% [0.00000%–0.03585%] | $1.37 [$0.00–$3.55] | 0.13× [0.00–0.42×] |
+| 2022 | 1,000 | 0.09% | Logistic Regression | 3 | 0.30% | 3.66% | 42.65× | $873,951.40 | 7.29766% [0.00000%–23.42393%] | $873.95 [$0.00–$2,621.29] | 85.06× [0.00–273.04×] |
+| 2022 | 2,500 | 0.21% | Isolation Forest | 1 | 0.04% | 1.22% | 5.69× | $70.92 | 0.00059% [0.00000%–0.00230%] | $0.03 [$0.00–$0.09] | 0.00× [0.00–0.01×] |
+| 2022 | 2,500 | 0.21% | LightGBM | 5 | 0.20% | 6.10% | 28.43× | $80,685.02 | 0.67373% [0.00381%–2.30819%] | $32.27 [$0.20–$90.39] | 3.14× [0.02–10.76×] |
+| 2022 | 2,500 | 0.21% | Logistic Regression | 4 | 0.16% | 4.88% | 22.74× | $2,022,435.40 | 16.88771% [0.00066%–39.65671%] | $808.97 [$0.03–$2,077.20] | 78.74× [0.00–184.90×] |
+| 2022 | 5,000 | 0.43% | Isolation Forest | 2 | 0.04% | 2.44% | 5.69× | $498.15 | 0.00416% [0.00000%–0.01466%] | $0.10 [$0.00–$0.28] | 0.01× [0.00–0.03×] |
+| 2022 | 5,000 | 0.43% | LightGBM | 12 | 0.24% | 14.63% | 34.12× | $1,709,281.66 | 14.27282% [2.44199%–32.30023%] | $341.86 [$55.93–$775.76] | 33.27× [5.69–75.30×] |
+| 2022 | 5,000 | 0.43% | Logistic Regression | 7 | 0.14% | 8.54% | 19.90× | $2,182,554.21 | 18.22473% [0.70332%–40.84359%] | $436.51 [$14.73–$1,080.39] | 42.49× [1.64–95.22×] |
+| 2023 | 100 | 0.01% | Isolation Forest | 0 | 0.00% | 0.00% | 0.00× | $0.00 | 0.00000% [0.00000%–0.00000%] | $0.00 [$0.00–$0.00] | 0.00× [0.00–0.00×] |
+| 2023 | 100 | 0.01% | LightGBM | 0 | 0.00% | 0.00% | 0.00× | $0.00 | 0.00000% [0.00000%–0.00000%] | $0.00 [$0.00–$0.00] | 0.00× [0.00–0.00×] |
+| 2023 | 100 | 0.01% | Logistic Regression | 0 | 0.00% | 0.00% | 0.00× | $0.00 | 0.00000% [0.00000%–0.00000%] | $0.00 [$0.00–$0.00] | 0.00× [0.00–0.00×] |
+| 2023 | 500 | 0.04% | Isolation Forest | 1 | 0.20% | 1.72% | 41.26× | $2,305,318.50 | 29.39331% [0.00000%–61.73731%] | $4,610.64 [$0.00–$13,831.91] | 703.40× [0.00–1,477.40×] |
+| 2023 | 500 | 0.04% | LightGBM | 0 | 0.00% | 0.00% | 0.00× | $0.00 | 0.00000% [0.00000%–0.00000%] | $0.00 [$0.00–$0.00] | 0.00× [0.00–0.00×] |
+| 2023 | 500 | 0.04% | Logistic Regression | 0 | 0.00% | 0.00% | 0.00× | $0.00 | 0.00000% [0.00000%–0.00000%] | $0.00 [$0.00–$0.00] | 0.00× [0.00–0.00×] |
+| 2023 | 1,000 | 0.08% | Isolation Forest | 1 | 0.10% | 1.72% | 20.63× | $2,305,318.50 | 29.39331% [0.00000%–61.73731%] | $2,305.32 [$0.00–$6,915.96] | 351.70× [0.00–738.70×] |
+| 2023 | 1,000 | 0.08% | LightGBM | 1 | 0.10% | 1.72% | 20.63× | $8,260.47 | 0.10532% [0.00000%–0.45866%] | $8.26 [$0.00–$24.78] | 1.26× [0.00–5.49×] |
+| 2023 | 1,000 | 0.08% | Logistic Regression | 0 | 0.00% | 0.00% | 0.00× | $0.00 | 0.00000% [0.00000%–0.00000%] | $0.00 [$0.00–$0.00] | 0.00× [0.00–0.00×] |
+| 2023 | 2,500 | 0.21% | Isolation Forest | 2 | 0.08% | 3.45% | 16.50× | $2,305,482.78 | 29.39541% [0.00000%–61.74021%] | $922.19 [$0.00–$2,766.51] | 140.69× [0.00–295.49×] |
+| 2023 | 2,500 | 0.21% | LightGBM | 2 | 0.08% | 3.45% | 16.50× | $14,243.98 | 0.18161% [0.00000%–0.63523%] | $5.70 [$0.00–$14.70] | 0.87× [0.00–3.04×] |
+| 2023 | 2,500 | 0.21% | Logistic Regression | 0 | 0.00% | 0.00% | 0.00× | $0.00 | 0.00000% [0.00000%–0.00000%] | $0.00 [$0.00–$0.00] | 0.00× [0.00–0.00×] |
+| 2023 | 5,000 | 0.42% | Isolation Forest | 3 | 0.06% | 5.17% | 12.38× | $2,925,921.28 | 37.30613% [0.00000%–67.00852%] | $585.18 [$0.00–$1,631.40] | 89.28× [0.00–160.35×] |
+| 2023 | 5,000 | 0.42% | LightGBM | 5 | 0.10% | 8.62% | 20.63× | $85,126.04 | 1.08538% [0.12482%–3.34920%] | $17.03 [$2.39–$37.85] | 2.60× [0.30–8.01×] |
+| 2023 | 5,000 | 0.42% | Logistic Regression | 3 | 0.06% | 5.17% | 12.38× | $57,582.57 | 0.73419% [0.00000%–2.95298%] | $11.52 [$0.00–$33.29] | 1.76× [0.00–7.07×] |
 
-The two raw-payment baselines found zero hits at every displayed capacity. P1's peer-adjusted services-per-beneficiary baseline found one 2022 hit at each K; its peer-adjusted payment-per-beneficiary baseline found none. The seeded random shortlists found zero in most individual draws; their expected hit count is below 0.1 even at K=1,000. The results CSV contains precision, recall, lift, and audits per hit for every method and capacity.
+## Pilot decision
 
-## Reconciliation with P1's independent 1% and 5% evaluation
+The presentation compares K = 1,000, 2,500 and 5,000. Of these three workloads, 5,000 was the only one where all three models had at least one hit in both years. At K = 2,500, logistic regression still had zero hits in 2023. LightGBM led on hits at K = 5,000 in both years. Increasing K from 2,500 to 5,000 added 7 LightGBM hits in 2022 (5 to 12) and 3 in 2023 (2 to 5).
 
-P1's cutoffs inspect much larger lists than fixed K: the top 1% selects 11,657 providers in 2022 and 11,966 in 2023; the top 5% selects 58,282 and 59,827. P4 uses exactly `ceil(share × evaluation-pool size)` rows and its fixed score-descending/NPI-ascending tie rule. ROC-AUC uses all scored rows. The two additional P1 baselines rank peer-standardised payment per beneficiary and services per beneficiary; missing peer scores are placed at the observed minimum, matching P1's baseline script.
+Use available audit capacity to set the pilot K. If 5,000 reviews are feasible, lead with LightGBM and compare it with logistic regression, Isolation Forest, and the current billing rule at the same workload. Validate the exploratory finding prospectively. Payment exposure can be concentrated in a few providers. Track actual recoveries and measured review costs.
 
-| Year | Approach | ROC-AUC | Recall@1% | Recall@5% |
-|---|---|---:|---:|---:|
-| 2022 | Isolation Forest | 0.678 | 7.3% (6/82) | 15.9% (13/82) |
-| 2022 | P1 peer-adjusted payment per beneficiary | 0.541 | 8.5% (7/82) | 19.5% (16/82) |
-| 2022 | P1 peer-adjusted services per beneficiary | 0.570 | 7.3% (6/82) | 14.6% (12/82) |
-| 2022 | LightGBM | 0.790 | 23.2% (19/82) | 40.2% (33/82) |
-| 2022 | Logistic regression | 0.819 | 14.6% (12/82) | 42.7% (35/82) |
-| 2023 | Isolation Forest | 0.687 | 6.9% (4/58) | 24.1% (14/58) |
-| 2023 | P1 peer-adjusted payment per beneficiary | 0.588 | 5.2% (3/58) | 19.0% (11/58) |
-| 2023 | P1 peer-adjusted services per beneficiary | 0.612 | 5.2% (3/58) | 19.0% (11/58) |
-| 2023 | LightGBM | 0.745 | 10.3% (6/58) | 34.5% (20/58) |
-| 2023 | Logistic regression | 0.756 | 10.3% (6/58) | 37.9% (22/58) |
+Net benefit is measured financial benefit minus review and measurable friction costs. ROI is net benefit divided by those costs. The historical test data supply billing exposure and later exclusion outcomes.
 
-All P1 AUCs and 1%/5% recalls reconcile after rounding except 2022 LightGBM Recall@1%: P1 reported 18/82 = 22.0%, while the fixed NPI tie rule selects 19/82 = 23.2%. The cutoff splits a 77-provider equal-score group, of which 49 are selected and one has a positive label. P1 confirmed its checker used `np.argsort(-s)` without a secondary tie key and will align it to P4's score-descending/NPI-ascending rule. This explains the tie-dependent difference; its Recall@5% agrees at 33/82 = 40.2%.
+## Files
 
-For these broader cutoffs, P4 resampled the same 113 distinct positive NPIs 20,000 times across both years, retaining every record of a sampled NPI together. The paired bootstrap intervals for LightGBM minus logistic regression include zero for year-weighted AUC, Recall@1%, and Recall@5% across both years. Thus the broader-cutoff evidence does not establish either supervised model as the unique winner. Some pooled supervised-versus-Isolation-Forest intervals exclude zero, conditional on the observed negative scores and fixed rankings. These intervals do not account for negative-provider sampling, retraining, or future-year drift.
-
-The supplemental pooled AUC is the positive-record-weighted average of the two year-specific AUCs, not a ROC-AUC from mixing scores across years. The primary results remain separate by year.
-
-## What the comparison shows
-
-- In 2022, LightGBM found 3 hits at K=500 versus 2 for logistic regression and 0 for Isolation Forest. Logistic regression's 2 hits were already on LightGBM's list.
-- In 2023, Isolation Forest found 1 hit at K=500 while the supervised models found 0. At K=1,000, LightGBM and Isolation Forest each found 1, but they were different providers.
-- All 18 paired 95% bootstrap intervals for fixed-K model hit differences include zero. The smallest exact paired p-value is 0.25. These narrow-shortlist checks do not establish a reliable winner or account for model retraining and future-year drift.
-- Across both test years there are 140 positive provider-year records but only 113 distinct positive NPIs. A supplementary pooled comparison resamples whole NPIs and also finds no reliable model difference; the primary metrics remain separate by year.
-- At the cutoffs used for the three models in 2022 and 2023, alternative ordering within tied scores would not change the observed hit counts.
-
-## Evaluation pool and upstream coverage
-
-| Year | Upstream eligible candidates | Individual evaluation pool (all scored) | Upstream candidates outside pool (unscored) | Positive records in evaluation pool | Positive records outside evaluation pool |
-|---|---:|---:|---:|---:|---:|
-| 2022 | 1,230,281 | 1,165,640 (94.7%) | 64,641 | 82 | 4 |
-| 2023 | 1,259,333 | 1,196,525 (95.0%) | 62,808 | 58 | 3 |
-
-The broader candidate pool includes organisations and is **not** the test denominator. P2 says candidates without features are mainly organisations. The 4 and 3 positive records outside the individual evaluation pool were not scored because they had no P2 feature row; their specific entity types cannot be verified because the local candidate file has no entity-type column. Within the evaluation pool, score coverage is 100%. Shortlist Medicare payment totals describe historical billing exposure only; no audit cost, adjudicated fraud, recoverable payment, or savings measure is available.
-
-## Evidence for the audit pilot
-
-Incremental yield is the model's later exclusions captured minus the number captured by a Medicare billing rule at the same year and K. The example uses P1's peer-adjusted services-per-beneficiary rule. The workload table includes comparisons against all four billing rules at K=100, 500 and 1,000.
-
-| Year | Model at K=500 | Additional exclusions vs. the peer services rule | Shortlist places per later exclusion | Historical Medicare payments |
-|---|---|---:|---:|---:|
-| 2022 | Isolation Forest | -1 | — | $840,731,065 |
-| 2022 | LightGBM | +2 | 166.7 | $4,565,052 |
-| 2022 | Logistic regression | +1 | 250.0 | $101,184,949 |
-| 2023 | Isolation Forest | +1 | 500.0 | $1,967,646,344 |
-| 2023 | LightGBM | +0 | — | $71,295,022 |
-| 2023 | Logistic regression | +0 | — | $953,876,018 |
-
-Shortlist places per later exclusion = K divided by the historical exclusions captured. A dash indicates zero observed exclusions. Medicare payments describe the historical dollars associated with the shortlist.
-
-Average Precision (AP) summarises how well the full ranking concentrates the rare exclusion outcome across score thresholds. P4 uses scikit-learn's non-interpolated Average Precision and displays each year's outcome prevalence as the random reference. Research on Medicare fraud detection has used the related precision–recall area metric, with different datasets and evaluation protocols ([Leevy et al.](https://doi.org/10.1080/1206212X.2024.2431874)).
-
-| Test year | LightGBM AP | Logistic regression AP | Isolation Forest AP | Pool prevalence reference |
-|---|---:|---:|---:|---:|
-| 2022 | 0.14486% | 0.09090% | 0.01950% | 0.00703% |
-| 2023 | 0.03435% | 0.02918% | 0.02446% | 0.00485% |
-
-At K=500 in 2022, the paired LightGBM-minus-logistic-regression difference was +1 later exclusion, with a 95% interval from 0 to 3. LightGBM had the highest observed AP in both years. AP is descriptive here; the fixed-K paired intervals quantify the uncertainty in the shortlist comparisons.
-
-## Provisional recommendation
-
-Carry **both LightGBM and logistic regression** as candidates into a prospective audit pilot; the NPI-clustered percentage-cutoff comparisons do not establish a unique supervised-model winner. Keep Isolation Forest as an additional comparator because it found a different 2023 hit at K=500. Do not deploy a combined list or claim a proven operational winner from these retrospective results. Report K=100, 500, and 1,000 as alternative narrow-list workloads; separately report P1's 1% and 5% capacities. Select a single operational capacity only after an audit team states its review capacity or audit cost/value rule; do not tune capacity on the 2022/2023 test outcomes.
-
-A prospective pilot should record completed reviews, confirmed findings, review costs, and actual recoveries. Report dollars recovered per 100 completed reviews and compare recoveries with review costs. Overpayment recoveries are an operational measure in [GAO's Medicare program integrity report](https://files.gao.gov/reports/GAO-26-107799/index.html).
-
-## Presentation figures and source tables
-
-- [Hits by audit capacity](../presentation_figures/p4_hits_by_k.png)
-- [Precision by audit capacity](../presentation_figures/p4_precision_by_k.png)
-- [Evaluation-pool coverage within upstream candidates](../presentation_figures/p4_scoring_coverage.png)
-- [P4 PowerPoint section](../presentation_figures/FraudLens_P4_Evaluation.pptx)
-- [Interactive dashboard](p4_dashboard.html)
-- [Consolidated results](p4_results.csv), [top-K shortlists](p4_top_k_shortlists.csv), [model comparison](p4_model_comparison.csv)
-- [Audit workload metrics](p4_audit_workload_metrics.csv), [Average Precision by year and model](p4_average_precision.csv)
-- [P1 percentage-cutoff reconciliation](p4_p1_percentage_reconciliation.csv), [P1 peer baselines at fixed K](p4_p1_peer_baseline_topk.csv), [NPI bootstrap intervals](p4_p1_percentage_bootstrap.csv), [paired bootstrap differences](p4_p1_percentage_paired_bootstrap.csv)
-- [Per-year paired uncertainty](p4_model_paired_uncertainty.csv), [NPI-clustered pooled check](p4_pooled_npi_uncertainty.csv), [random benchmark](p4_seeded_random_baseline.csv), [coverage](p4_scoring_coverage_summary.csv)
-
-## Team confirmation before publication
-
-1. P1's outcome and evaluation-population definitions are confirmed in the team reply. Obtain the actual generated `eval_pool.parquet` if a direct file-to-file key comparison is required; the published construction has already been reconciled exactly.
-2. P2 confirmed the final individual-practitioner feature file, `medicare_payment` for total-payment volume and `pymt_per_bene` for payment-per-beneficiary intensity.
-3. P3's score direction, 2020-only selection and mature training-year split are confirmed. If predictions change, revalidate that handoff before rerunning P4.
-4. The team requested audit-yield reporting without a fixed budget or cost. P4 has completed that comparison; a future operational sponsor would need to state capacity or costs before selecting one K.
+- [Consolidated metrics](p4_results.csv)
+- [Dashboard](p4_dashboard.html)
+- [Top-K provider lists for the original workloads](p4_top_k_shortlists.csv). The rebuild writes the full provider-level export, including both exploratory workloads, to the local `out/p4/` folder.
+- [Three-slide P4 presentation](../presentation_figures/FraudLens_P4_Evaluation_ThreeSlides.pptx)
