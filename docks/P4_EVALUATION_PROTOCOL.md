@@ -28,7 +28,7 @@ For random selection, each provider has probability K / N of being selected, whe
 
 ## Presentation and pilot workload
 
-The three-slide deck compares K = 1,000, 2,500 and 5,000. K = 5,000 is the focus because every model had a hit in both years at that workload, the only one of the three shown where this occurred. At that workload LightGBM led on hits in both test years. The pilot K follows the audit team's available review capacity. Validate the exploratory finding prospectively at the chosen K.
+The three-slide deck compares K = 1,000, 2,500 and 5,000. P4 chose K = 5,000 for the detailed exploratory comparison after seeing the test results. It is the only workload shown where every model had a hit in both years. LightGBM had the most observed hits in both years at that workload. Pilot LightGBM and Logistic Regression at the same K, set by the audit team's available review capacity.
 
 ## Audit pilot measures
 
