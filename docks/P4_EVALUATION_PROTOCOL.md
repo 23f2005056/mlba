@@ -24,8 +24,10 @@ the individual evaluation pool have all three model scores.
 - Primary held-out test years: **2022 and 2023**, reported separately. The 2020
   predictions are validation data and are not a held-out test result.
 - P3's three approaches are `supervised_lgbm`, `supervised_logreg`, and
-  `anomaly_iforest`. Rank each approach by descending `score`. The two
-  supervised scores are predicted exclusion probabilities. P3 negated the
+  `anomaly_iforest`. Rank each approach by descending `score`.
+  LightGBM and logistic regression scores rank providers by exclusion risk.
+  They are not calibrated probabilities because training down-sampled
+  negatives and weighted positives heavily. P3 negated the
   Isolation Forest anomaly score, so more unusual billing ranks higher; it is
   not an exclusion probability. Isolation Forest is fitted on each decision
   year's billing features, which P3 says are available at that decision date,
