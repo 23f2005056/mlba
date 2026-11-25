@@ -1,7 +1,0 @@
-year,approach,K,hits_at_k,observed_medicare_payment_sum,observed_medicare_payment_median,payment_per_beneficiary_median,distinct_specialties,missing_specialty,overlap_with_highest_total_payment,overlap_pct_with_highest_total_payment,overlap_with_highest_payment_per_beneficiary,overlap_pct_with_highest_payment_per_beneficiary
-2022,supervised_lgbm,100,1,234834.13780593872,1048.739990234375,90.55455017089844,30,0,0,0.0,0,0.0
-2022,supervised_lgbm,500,3,4565051.561832428,1588.3399658203125,127.98078918457031,52,0,0,0.0,0,0.0
-2022,supervised_lgbm,1000,3,12689855.056518555,1550.0650024414062,105.69369506835938,60,0,0,0.0,0,0.0
-2023,supervised_lgbm,100,0,30829149.79736328,23582.9951171875,285.88006591796875,29,0,0,0.0,0,0.0
-2023,supervised_lgbm,500,0,71295022.46027374,7405.255126953125,203.3373260498047,51,0,2,0.004,0,0.0
-2023,supervised_lgbm,1000,1,84178767.35202408,4984.219970703125,146.62283325195312,59,0,4,0.004,3,0.003
